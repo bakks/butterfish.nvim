@@ -39,8 +39,11 @@ end
 -- Script: prompt.sh
 -- Args: filetype (language), prompt
 butterfish.prompt = function(userPrompt)
+  -- Get the current filetype of the buffer
   local filetype = vim.bo.filetype
+  -- Create a command by concatenating the base path, script name, filetype, and escaped user prompt
   local command = basePath .. "prompt.sh " .. filetype .. " '" .. escape_code(userPrompt) .. "'"
+  -- Execute the command by passing it to the run_command function
   run_command(command)
 end
 
@@ -49,9 +52,13 @@ end
 -- Script: fileprompt.sh
 -- Args: file path, prompt
 butterfish.file_prompt = function(userPrompt)
+  -- Get the current filetype of the buffer
   local filetype = vim.bo.filetype
+  -- Get the full path of the current file
   local filepath = vim.fn.expand("%:p")
+  -- Create a command by concatenating the base path, script name, file path, and escaped user prompt
   local command = basePath .. "fileprompt.sh " .. filepath .. " '" .. escape_code(userPrompt) .. "'"
+  -- Execute the command by passing it to the run_command function
   run_command(command)
 end
 
