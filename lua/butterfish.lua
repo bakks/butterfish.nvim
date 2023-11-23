@@ -1,5 +1,5 @@
-local gpt = {}
-local basePath = vim.fn.expand("$HOME") .. "/bf.nvim/"
+local butterfish = {}
+local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 
 -- [ ] Prompt with the file as context
 -- [ ] Fix the error on the current line
@@ -38,7 +38,7 @@ end
 -- Enter an LLM prompt and write the response at the cursor
 -- Script: prompt.sh
 -- Args: filetype (language), prompt
-gpt.prompt = function(userPrompt)
+butterfish.prompt = function(userPrompt)
   local filetype = vim.bo.filetype
   local command = basePath .. "prompt.sh " .. filetype .. " '" .. escape_code(userPrompt) .. "'"
   run_command(command)
@@ -48,7 +48,7 @@ end
 -- file as context
 -- Script: fileprompt.sh
 -- Args: file path, prompt
-gpt.file_prompt = function(userPrompt)
+butterfish.file_prompt = function(userPrompt)
   local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
   local command = basePath .. "fileprompt.sh " .. filepath .. " '" .. escape_code(userPrompt) .. "'"
@@ -58,7 +58,7 @@ end
 -- Rewrite the selected text given instructions from the prompt
 -- Script: rewrite.sh
 -- Args: selected text, prompt
-gpt.rewrite = function(start_range, end_range, userPrompt)
+butterfish.rewrite = function(start_range, end_range, userPrompt)
   local filetype = vim.bo.filetype
   local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
   local selectedText = table.concat(lines, "\n")
@@ -71,22 +71,25 @@ gpt.rewrite = function(start_range, end_range, userPrompt)
     vim.api.nvim_win_set_cursor(0, {end_range, 0})
   else
     -- We don't know where the cursor is, so move it to the end of the selection
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("'>", true, true, true), "n", true)
+    vim.api.nvim_feedkeys(
+      vim.api.nvim_replace_termcodes("'>", true, true, true), "n", true)
   end
 
   -- Insert a new line below current line
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
   -- Clear out the current line, this is necessary because we may have just
   -- commented out the line above, which may extend down to the newline we added
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("_d$", true, true, true), "n", true)
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("_d$", true, true, true), "n", true)
   run_command(command)
 end
 
 
 -- Expose the function to Neovim by creating a command
-vim.cmd("command! -nargs=1 BFPrompt lua require'gpt'.prompt(<q-args>)")
-vim.cmd("command! -nargs=1 BFFilePrompt lua require'gpt'.file_prompt(<q-args>)")
-vim.cmd("command! -range -nargs=* BFRewrite :lua require'gpt'.rewrite(<line1>, <line2>, <q-args>)")
+vim.cmd("command! -nargs=1 BFPrompt lua require'butterfish'.prompt(<q-args>)")
+vim.cmd("command! -nargs=1 BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
+vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
 
-return gpt
+return butterfish
 
