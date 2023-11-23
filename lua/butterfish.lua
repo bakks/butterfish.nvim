@@ -119,7 +119,7 @@ butterfish.comment = function(start_range, end_range)
 end
 
 
--- Expose the function to Neovim by creating a command
+-- Commands for each function
 vim.cmd("command! -nargs=1 BFPrompt lua require'butterfish'.prompt(<q-args>)")
 vim.cmd("command! -nargs=1 BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
 vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
