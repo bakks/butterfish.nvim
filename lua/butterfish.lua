@@ -6,7 +6,6 @@ local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 -- [ ] Fill in a function
 -- [ ] Rewrite selected text
 -- [ ] Add a comment explaining the selected line / block
--- [ ] Handle single quotes in the prompt
 
 local run_command = function(command)
   local job_id = vim.fn.jobstart(command, {
@@ -14,6 +13,7 @@ local run_command = function(command)
       vim.schedule(function()
         -- vim.api.nvim_buf_set_lines(0, -1, -1, false, data)
         -- insert text at cursor position, don't adjust indent, move cursor to end
+        vim.cmd("undojoin")
         vim.api.nvim_put(data, 'c', { append = true }, true)
       end)
     end,
@@ -56,8 +56,11 @@ butterfish.file_prompt = function(userPrompt)
 end
 
 -- Rewrite the selected text given instructions from the prompt
--- Script: rewrite.sh
--- Args: selected text, prompt
+-- Args:
+--   start_range    start of visual line range
+--   end_range      end of visual line range
+--   userPrompt     prompt to send to LLM
+-- Script: rewrite.sh filetype selected_text prompt
 butterfish.rewrite = function(start_range, end_range, userPrompt)
   local filetype = vim.bo.filetype
   local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
@@ -76,12 +79,35 @@ butterfish.rewrite = function(start_range, end_range, userPrompt)
   end
 
   -- Insert a new line below current line
+  vim.cmd("undojoin")
   vim.api.nvim_feedkeys(
     vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
+
   -- Clear out the current line, this is necessary because we may have just
   -- commented out the line above, which may extend down to the newline we added
+  vim.cmd("undojoin")
   vim.api.nvim_feedkeys(
     vim.api.nvim_replace_termcodes("_d$", true, true, true), "n", true)
+  run_command(command)
+end
+
+-- Add a comment above the current line or block explaining it
+-- Args:
+--  start_range    start of visual line range
+--  end_range      end of visual line range
+-- Script: comment.sh filepath selected_text
+butterfish.comment = function(start_range, end_range)
+  local filepath = vim.fn.expand("%:p")
+  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
+  local selectedText = table.concat(lines, "\n")
+  local command = basePath .. "comment.sh " .. filepath .. " '" .. escape_code(selectedText) .. "'"
+
+  -- Move to the beginning of the range
+  vim.api.nvim_win_set_cursor(0, {start_range, 0})
+  -- Add a new line above the current line
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("O<ESC>", true, true, true), "n", true)
+
   run_command(command)
 end
 
@@ -90,6 +116,7 @@ end
 vim.cmd("command! -nargs=1 BFPrompt lua require'butterfish'.prompt(<q-args>)")
 vim.cmd("command! -nargs=1 BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
 vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
+vim.cmd("command! -range -nargs=* BFComment :lua require'butterfish'.comment(<line1>, <line2>)")
 
 return butterfish
 
