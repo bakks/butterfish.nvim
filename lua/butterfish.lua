@@ -107,20 +107,18 @@ butterfish.rewrite = function(start_range, end_range, userPrompt)
     vim.api.nvim_win_set_cursor(0, {end_range, 0})
   else
     -- We don't know where the cursor is, so move it to the end of the selection
-    vim.api.nvim_feedkeys(
-      vim.api.nvim_replace_termcodes("'>", true, true, true), "n", true)
+    keys("n", "'>")
   end
 
   -- Insert a new line below current line
   vim.cmd("undojoin")
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
+  keys("n", "A<CR><ESC>")
 
   -- Clear out the current line, this is necessary because we may have just
   -- commented out the line above, which may extend down to the newline we added
   vim.cmd("undojoin")
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("_d$", true, true, true), "n", true)
+  keys("n", "_d$")
+
   run_command(command)
 end
 
@@ -169,21 +167,18 @@ butterfish.explain = function(start_range, end_range)
 
     -- Insert a new line below current line
     vim.cmd("undojoin")
-    vim.api.nvim_feedkeys(
-      vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
+    keys("n", "A<CR><ESC>")
 
     -- Clear out the current line, this is necessary because we may have just
     -- commented out the line above, which may extend down to the newline we added
     vim.cmd("undojoin")
-    vim.api.nvim_feedkeys(
-      vim.api.nvim_replace_termcodes("_d$", true, true, true), "n", true)
+    keys("n", "_d$")
   else
     -- If a single line, move up and create a newline
     -- Move to the beginning of the range
     vim.api.nvim_win_set_cursor(0, {start_range, 0})
     -- Add a new line above the current line
-    vim.api.nvim_feedkeys(
-      vim.api.nvim_replace_termcodes("O<ESC>", true, true, true), "n", true)
+    keys("n", "O<ESC>")
   end
 
   run_command(command)
@@ -217,13 +212,11 @@ butterfish.fix = function()
   -- Comment out the current line
   -- Check if Commentary plugin is installed
   if vim.fn.exists(":Commentary") then
-    vim.api.nvim_feedkeys(
-      vim.api.nvim_replace_termcodes(":" .. line_number .. "Commentary<CR>", true, true, true), "n", true)
+    keys("n", ":" .. line_number .. "Commentary<CR>")
   end
 
   -- Add a new line below the current line
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("A<CR><ESC>", true, true, true), "n", true)
+  keys("n", "A<CR><ESC>")
 
   -- Create a command to send the error message to LLM
   local command = basePath .. "fix.sh " .. filepath .. " '" .. escape_code(error_message) .. "' '" .. escape_code(context) .. "'"
