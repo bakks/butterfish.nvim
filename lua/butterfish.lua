@@ -21,7 +21,6 @@ local run_command = function(command, callback)
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        -- vim.api.nvim_buf_set_lines(0, -1, -1, false, data)
         -- insert text at cursor position, don't adjust indent, move cursor to end
         vim.api.nvim_put(data, 'c', { append = true }, true)
       end)
@@ -235,12 +234,17 @@ end
 butterfish.fix = function()
   -- Get the current line number
   local line_number = vim.api.nvim_win_get_cursor(0)[1]
-  -- Get the full path of the current file
-  local filepath = vim.fn.expand("%:p")
+  local filetype = vim.bo.filetype
 
   -- Safely retrieve the error message from line diagnostics
   local line_diagnostics = vim.lsp.diagnostic.get_line_diagnostics()
-  local error_message = (line_diagnostics and line_diagnostics[line_number] and line_diagnostics[line_number][1] and line_diagnostics[line_number][1].message) or nil
+  local error_message = (line_diagnostics and line_diagnostics[1] and line_diagnostics[1].message) or nil
+
+  -- If there is no error message, return
+  if error_message == nil then
+    print("No error message found")
+    return
+  end
 
   -- Get the 5 lines before and after the current line
   local context_start = math.max(0, line_number - 6)
@@ -258,7 +262,7 @@ butterfish.fix = function()
   keys("n", "A<CR><ESC>")
 
   -- Create a command to send the error message to LLM
-  local command = basePath .. "fix.sh " .. filepath .. " '" .. escape_code(error_message) .. "' '" .. escape_code(context) .. "'"
+  local command = basePath .. "fix.sh " .. filetype .. " '" .. escape_code(error_message) .. "' '" .. escape_code(context) .. "'"
 
   -- Send the command to LLM and insert the response at the cursor
   run_command(command)
