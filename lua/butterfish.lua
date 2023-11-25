@@ -1,14 +1,6 @@
 local butterfish = {}
 local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 
--- [ ] Prompt with the file as context
--- [ ] Fix the error on the current line
--- [ ] Fill in a function
--- [ ] Rewrite selected text
--- [ ] Add a comment explaining the selected line / block
--- [ ] Ask a question about the selected line / block and write to comment
-
-
 local color_to_change = "User1"
 local active_color = "197"
 
