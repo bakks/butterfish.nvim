@@ -12,18 +12,17 @@ local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 local color_to_change = "User1"
 local active_color = "197"
 
-local run_command = function(command)
-  -- get current hi Statusline guibg color
+local run_command = function(command, callback)
+  -- get current highlight color
   local original_hl = vim.api.nvim_get_hl_by_name(color_to_change, false).background
   -- set status bar to pink while running
-  vim.cmd("hi User1 ctermbg=" .. active_color)
+  vim.cmd("hi " .. color_to_change .. " ctermbg=" .. active_color)
 
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
         -- vim.api.nvim_buf_set_lines(0, -1, -1, false, data)
         -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.cmd("undojoin")
         vim.api.nvim_put(data, 'c', { append = true }, true)
       end)
     end,
@@ -37,13 +36,17 @@ local run_command = function(command)
       end)
     end,
 
-    on_exit = function()
-      --reset status bar
-      vim.cmd("hi " .. color_to_change .. " ctermbg=" .. original_hl)
+    on_exit = function(job_id, exit_code, event_type)
+      vim.schedule(function()
+        -- call callback now that the child process is done
+        if callback then
+          callback()
+        end
+        --reset status bar
+        vim.cmd("hi " .. color_to_change .. " ctermbg=" .. original_hl)
+      end)
     end,
   })
-  
-  -- print("Job ID: " .. job_id)
 end
 
 -- Define a function 'keys' that takes a single argument 'k'
@@ -59,6 +62,38 @@ end
 -- adding a backslash before them
 local escape_code = function(text)
   return text:gsub("'", "'\\''")
+end
+
+-- Remove empty lines from the cursor line up until the first non-empty line
+-- - Do a loop
+-- - Get the current line
+-- - If the line is empty, delete it
+-- - If the line is not empty, break
+local clean_up_empty_lines = function()
+  -- Get the current line number
+  local line_number = vim.api.nvim_win_get_cursor(0)[1]
+
+  -- Start a loop that will continue until it hits a non-empty line
+  while true do
+    -- Get the text of the current line
+    local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
+
+    -- If the line is empty or only contains whitespace, delete it
+    if line_text == nil or line_text:match("^%s*$") then
+      vim.api.nvim_buf_set_lines(0, line_number - 1, line_number, false, {})
+    else
+      -- If the line is not empty, break the loop
+      break
+    end
+
+    -- Decrement the line number to move up one line
+    line_number = line_number - 1
+
+    -- If we've reached the top of the file, break the loop
+    if line_number == 0 then
+      break
+    end
+  end
 end
 
 -- Enter an LLM prompt and write the response at the cursor
@@ -117,9 +152,9 @@ butterfish.rewrite = function(start_range, end_range, userPrompt)
   -- Clear out the current line, this is necessary because we may have just
   -- commented out the line above, which may extend down to the newline we added
   vim.cmd("undojoin")
-  keys("n", "_d$")
+  keys("n", "_d$<ESC>")
 
-  run_command(command)
+  run_command(command, clean_up_empty_lines)
 end
 
 -- Add a comment above the current line or block explaining it
@@ -133,12 +168,16 @@ butterfish.comment = function(start_range, end_range)
   local selectedText = table.concat(lines, "\n")
   local command = basePath .. "comment.sh " .. filepath .. " '" .. escape_code(selectedText) .. "'"
 
+  keys("n", " <BS><ESC>")
   -- Move to the beginning of the range
   vim.api.nvim_win_set_cursor(0, {start_range, 0})
   -- Add a new line above the current line
   keys("n", "O<ESC>")
+  -- Clear out the current line, this is necessary because we may have just
+  -- commented out the line above, which may extend down to the newline we added
+  keys("n", "_d$<ESC>")
 
-  run_command(command)
+  run_command(command, clean_up_empty_lines)
 end
 
 -- Explain a line or block of code in detail

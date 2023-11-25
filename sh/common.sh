@@ -13,6 +13,6 @@ lm_command() {
   if [ -z "$model" ]; then
     model=$DEFAULT_MODEL
   fi
-  $HOME/butterfish/bin/butterfish prompt -vL -m $model --no-color --no-backticks -s "$1" "$2" < /dev/null
+  $HOME/butterfish/bin/butterfish prompt -vL -m $model -T 0.5 --no-color --no-backticks -s "$1" "$2" < /dev/null
 }
 
