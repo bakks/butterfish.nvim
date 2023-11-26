@@ -1,6 +1,6 @@
 local butterfish = {}
-local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 
+local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 local color_to_change = "User1"
 local active_color = "197"
 
@@ -13,6 +13,8 @@ local run_command = function(command, callback)
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
+        -- undojoin to prevent undoing the command
+        vim.cmd("undojoin")
         -- insert text at cursor position, don't adjust indent, move cursor to end
         vim.api.nvim_put(data, 'c', { append = true }, true)
       end)
@@ -101,8 +103,7 @@ end
 
 -- Enter an LLM prompt and write the response at the cursor, including the open
 -- file as context
--- Script: fileprompt.sh
--- Args: file path, prompt
+-- Script: fileprompt.sh filepath prompt
 butterfish.file_prompt = function(userPrompt)
   -- Get the current filetype of the buffer
   local filetype = vim.bo.filetype
@@ -260,6 +261,36 @@ butterfish.fix = function()
   run_command(command)
 end
 
+-- Implement the next block of code based on the previous lines
+-- - Get the current line number
+-- - Get the previous 150 lines
+-- - Call implement.sh
+-- Script: implement.sh previous_lines
+butterfish.implement = function()
+  -- Get the current line number
+  local line_number = vim.api.nvim_win_get_cursor(0)[1]
+  -- Get the file type
+  local filetype = vim.bo.filetype
+  -- Get the 150 lines before the current line
+  local context_start = math.max(0, line_number - 150)
+  local context_end = line_number - 1
+  local context_lines = vim.api.nvim_buf_get_lines(0, context_start, context_end, false)
+  local context = table.concat(context_lines, "\n")
+
+  local command = basePath .. "implement.sh " .. filetype .. " '" .. escape_code(context) .. "'"
+
+  -- if the current line is not empty
+  if vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1] ~= "" then
+    -- Insert a new line below current line
+    keys("n", "A<CR><ESC>")
+
+    -- Clear out the current line, this is necessary because we may have just
+    -- commented out the line above, which may extend down to the newline we added
+    keys("n", "_d$<ESC>")
+  end
+
+  run_command(command)
+end
 
 -- Commands for each function
 vim.cmd("command! -nargs=1 BFPrompt lua require'butterfish'.prompt(<q-args>)")
@@ -268,6 +299,7 @@ vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<li
 vim.cmd("command! -range -nargs=* BFComment :lua require'butterfish'.comment(<line1>, <line2>)")
 vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<line1>, <line2>)")
 vim.cmd("command! BFFix lua require'butterfish'.fix()")
+vim.cmd("command! BFImplement lua require'butterfish'.implement()")
 
 return butterfish
 
