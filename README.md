@@ -34,49 +34,52 @@ I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this p
 
 ### BFPrompt
 
--   **Command** : `:BFPrompt`
--   **Arguments**: Takes one argument as a user prompt.
--   **Context**: Operates on a single line. The command passes the current filetype of the buffer and the user prompt to the ai model.
--   **Description**: Enters a user prompt and writes the response at the cursor. The ai model script used is `prompt.sh`.
+-   **Command** : `:BFPrompt <prompt>`
+-   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
+-   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
+-   **Context**: The current filetype is used (i.e. programming language), no other context is passed to the model.
+-   **Script**: `prompt.sh 'filetype' 'prompt'`
 
 ### BFFilePrompt
 
--   **Command** : `:BFFilePrompt`
--   **Arguments**: Takes one argument as a user prompt.
--   **Context**: Operates on a single line. The command passes the current filetype of the buffer, full path of the current file, and the user prompt to the ai model.
--   **Description**: Similar to BFPrompt, but also includes the open file as context. The ai model script used is `fileprompt.sh`.
+-   **Command** : `:BFFilePrompt <prompt>`
+-   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
+-   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
+-   **Context**: The content of the current file is passed to the model.
+-   **Script**: `prompt.sh 'filepath' 'prompt'`
 
 ### BFRewrite
 
--   **Command** : `:BFRewrite`
--   **Arguments**: Takes range of lines and user prompt as arguments.
--   **Context**: Operates on a block of lines. The command passes the range of selected lines and user prompt to the ai model.
--   **Description**: Rewrites the selected text given instructions from the user prompt. The ai model script used is `rewrite.sh`.
+-   **Command** : `:BFRewrite <prompt>`
+-   **Arguments**: A prompt describing how to rewrite the selected code
+-   **Description**: Comments out the currently selected code and rewrites it based on a prompt.
+-   **Context**: Operates on a block of lines. The command passes the range of selected lines and user prompt to the ai model along with the file type.
+-   **Script**: `rewrite.sh 'filetype' 'codeblock' 'prompt'`
 
 ### BFComment
 
 -   **Command** : `:BFComment`
--   **Arguments**: Takes range of lines as arguments.
--   **Context**: Operates on a block of lines. The command passes the range of selected lines to the ai model.
--   **Description**: Adds a comment above the current line or block explaining it. The ai model script used is `comment.sh`.
+-   **Description**: Adds a comment above the current line or block explaining it.
+-   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
+-   **Script**: `comment.sh 'filepath' 'codeblock'`
 
 ### BFExplain
 
 -   **Command** : `:BFExplain`
--   **Arguments**: Takes range of lines as arguments.
--   **Context**: Operates on a block of lines. The command passes the range of selected lines to the ai model.
--   **Description**: Explains a line or block of code in detail. The ai model script used is `explain.sh`.
+-   **Description**: Explains a line or block of code in detail, for example, adds a comment above each line in a block of code.
+-   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
+-   **Script**: `explain.sh 'filepath' 'codeblock'`
 
 ### BFFix
 
 -   **Command** : `:BFFix`
--   **Arguments**: No arguments needed.
--   **Context**: Operates on a single line. The command fetches the error message from the current line, the 5 lines before and after the current line, comments out the current line, and sends the error message to the ai model.
--   **Description**: Attempts to fix the error on the current line. The ai model script used is `fix.sh`.
+-   **Description**: Attempts to fix an LSP error on the current line. Will comment out the current line and generate a new one.
+-   **Context**: Operates on a single line, but passes the preceding and succeeding 5 lines to the model to help provide context.
+-   **Script**: `explain.sh 'filetype' 'errormessage' 'errorblock'`
 
 ### BFImplement
 
 -   **Command** : `:BFImplement`
--   **Arguments**: No arguments needed.
--   **Context**: Operates on a single line. The command fetches the previous 150 lines and sends them to the ai model.
--   **Description**: Implements the next block of code based on the previous lines. The ai model script used is `implement.sh`.
+-   **Description**: Like superpowered autocomplete, this attempts to complete whatever code you're writing, for example works well if you start it on a line with a function signature.
+-   **Context**: The command fetches the previous 150 lines and sends them to the ai model.
+-   **Script**: `implement.sh 'filetype' 'codeblock'`
