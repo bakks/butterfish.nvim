@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# fix.sh
+# Arguments:
+#   - filetype: the programming language of the file, e.g. go, py, js
+#   - codeblock: a block of code to find and fix a single-line error in
+# Output: Identifies an error in a block of code, rewrites the line in
+#        question, streams it to stdout
+# Example: ./fix.sh go "a := 1 + 2\nb := 1 + '2'\nc := 5 + 6"
+# butterfish.nvim command: :BFFix
+
+# This is a script for butterfish.nvim, it accepts arguments from the plugin
+# constructs language model prompts, and calls Butterfish to generate a response
+# using the OpenAI API. You can modify this script to change the prompt, or
+# swap in a different language model.
+
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 

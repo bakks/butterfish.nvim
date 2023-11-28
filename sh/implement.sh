@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# implement.sh
+# Arguments:
+#   - filetype: the programming language of the file, e.g. go, py, js
+#   - codeblock: the code leading up to the block we want to implement
+# Output: Generates a block completion using GPT-4, meaning given preceding code
+#        it will generate the next block of code, streams it to stdout
+# Example: ./implement.sh go "func fibo(n int) int {\n"
+# butterfish.nvim command: :BFImplement
+
+# This is a script for butterfish.nvim, it accepts arguments from the plugin
+# constructs language model prompts, and calls Butterfish to generate a response
+# using the OpenAI API. You can modify this script to change the prompt, or
+# swap in a different language model.
+
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
