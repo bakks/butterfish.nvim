@@ -1,5 +1,12 @@
-local butterfish = {}
+-- butterfish.nvim
+--   github.com/bakks/butterfish.nvim
+--
+-- This is a Neovim plugin for writing code with the help of large language
+-- models. This file defines commands that can be called from Neovim, the
+-- commands will stream LLM output to the current buffer. Each command has
+-- a corresponding shell script which sets up the prompt and calls the LLM.
 
+local butterfish = {}
 local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
 local color_to_change = "User1"
 local active_color = "197"
@@ -89,6 +96,26 @@ local clean_up_empty_lines = function()
   end
 end
 
+-- If the current line has text, create a new line below it and clear it out
+-- if necessary
+local move_to_clear_line = function()
+  -- Get the current line number
+  local line_number = vim.api.nvim_win_get_cursor(0)[1]
+
+  -- Get the text of the current line
+  local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
+
+  -- If the line is not empty, create a new line below it and clear it out
+  if line_text ~= nil and line_text ~= "" then
+    -- Insert a new line below current line
+    keys("n", "A<CR><ESC>")
+
+    -- Clear out the current line, this is necessary because we may have just
+    -- commented out the line above, which may extend down to the newline we added
+    keys("n", "_d$<ESC>")
+  end
+end
+
 -- Enter an LLM prompt and write the response at the cursor
 -- Script: prompt.sh
 -- Args: filetype (language), prompt
@@ -97,6 +124,9 @@ butterfish.prompt = function(userPrompt)
   local filetype = vim.bo.filetype
   -- Create a command by concatenating the base path, script name, filetype, and escaped user prompt
   local command = basePath .. "prompt.sh " .. filetype .. " '" .. escape_code(userPrompt) .. "'"
+
+  move_to_clear_line()
+
   -- Execute the command by passing it to the run_command function
   run_command(command)
 end
@@ -111,6 +141,9 @@ butterfish.file_prompt = function(userPrompt)
   local filepath = vim.fn.expand("%:p")
   -- Create a command by concatenating the base path, script name, file path, and escaped user prompt
   local command = basePath .. "fileprompt.sh " .. filepath .. " '" .. escape_code(userPrompt) .. "'"
+
+  move_to_clear_line()
+
   -- Execute the command by passing it to the run_command function
   run_command(command)
 end
@@ -137,14 +170,7 @@ butterfish.rewrite = function(start_range, end_range, userPrompt)
     keys("n", "'>")
   end
 
-  -- Insert a new line below current line
-  vim.cmd("undojoin")
-  keys("n", "A<CR><ESC>")
-
-  -- Clear out the current line, this is necessary because we may have just
-  -- commented out the line above, which may extend down to the newline we added
-  vim.cmd("undojoin")
-  keys("n", "_d$<ESC>")
+  move_to_clear_line()
 
   run_command(command, clean_up_empty_lines)
 end
@@ -196,14 +222,7 @@ butterfish.explain = function(start_range, end_range)
       keys("n", ",>")
     end
 
-    -- Insert a new line below current line
-    vim.cmd("undojoin")
-    keys("n", "A<CR><ESC>")
-
-    -- Clear out the current line, this is necessary because we may have just
-    -- commented out the line above, which may extend down to the newline we added
-    vim.cmd("undojoin")
-    keys("n", "_d$")
+    move_to_clear_line()
   else
     -- If a single line, move up and create a newline
     -- Move to the beginning of the range
@@ -251,8 +270,7 @@ butterfish.fix = function()
     keys("n", ":" .. line_number .. "Commentary<CR>")
   end
 
-  -- Add a new line below the current line
-  keys("n", "A<CR><ESC>")
+  move_to_clear_line()
 
   -- Create a command to send the error message to LLM
   local command = basePath .. "fix.sh " .. filetype .. " '" .. escape_code(error_message) .. "' '" .. escape_code(context) .. "'"
@@ -279,16 +297,7 @@ butterfish.implement = function()
 
   local command = basePath .. "implement.sh " .. filetype .. " '" .. escape_code(context) .. "'"
 
-  -- if the current line is not empty
-  if vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1] ~= "" then
-    -- Insert a new line below current line
-    keys("n", "A<CR><ESC>")
-
-    -- Clear out the current line, this is necessary because we may have just
-    -- commented out the line above, which may extend down to the newline we added
-    keys("n", "_d$<ESC>")
-  end
-
+  move_to_clear_line()
   run_command(command)
 end
 
