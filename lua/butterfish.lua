@@ -252,6 +252,36 @@ butterfish.explain = function(start_range, end_range)
   run_command(command)
 end
 
+local comment_current_line = function()
+  if vim.fn.exists(":Commentary") then
+    keys("n", ":Commentary<CR>")
+  end
+end
+
+-- Ask a question about the current line or block
+-- This will move above the line or block and create a new line
+-- It will add "Question: <prompt>" to the new line and comment it out
+-- Script: question.sh filepath selected_text prompt
+butterfish.question = function(start_range, end_range, user_prompt)
+  local filepath = vim.fn.expand("%:p")
+  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
+  local selectedText = table.concat(lines, "\n")
+  local command = basePath .. "question.sh " .. filepath .. " '" .. escape_code(selectedText) .. "' '" .. user_prompt .. "'"
+
+  move_up_to_clear_line(start_range, end_range)
+
+  -- Add Question: <prompt> to the new line and comment it out
+  keys("n", "iQuestion: " .. user_prompt .. "<ESC>")
+  comment_current_line()
+
+  -- Add Answer: to a new line below the current line
+  keys("n", "oAnswer:  <ESC>")
+  comment_current_line()
+  keys("n", "A<ESC>")
+
+  run_command(command)
+end
+
 
 -- Attempt to fix the error on the current line
 -- - Fetches the error message from the current line
@@ -631,6 +661,7 @@ vim.cmd("command! -nargs=1 BFFilePrompt lua require'butterfish'.file_prompt(<q-a
 vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
 vim.cmd("command! -range -nargs=* BFComment :lua require'butterfish'.comment(<line1>, <line2>)")
 vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<line1>, <line2>)")
+vim.cmd("command! -range -nargs=* BFQuestion :lua require'butterfish'.question(<line1>, <line2>, <q-args>)")
 vim.cmd("command! BFFix lua require'butterfish'.fix()")
 vim.cmd("command! BFImplement lua require'butterfish'.implement()")
 vim.cmd("command! BFHammer lua require'butterfish'.hammer()")
