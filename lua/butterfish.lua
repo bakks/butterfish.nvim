@@ -172,6 +172,12 @@ local comment_line_or_block = function(start_range, end_range)
   end
 end
 
+local comment_current_line = function()
+  if vim.fn.exists(":Commentary") then
+    keys("n", ":Commentary<CR>")
+  end
+end
+
 -- Enter an LLM prompt and write the response at the cursor
 -- Script: prompt.sh
 -- Args: filetype (language), prompt
@@ -250,12 +256,6 @@ butterfish.explain = function(start_range, end_range)
 
   move_up_to_clear_line(start_range, end_range)
   run_command(command)
-end
-
-local comment_current_line = function()
-  if vim.fn.exists(":Commentary") then
-    keys("n", ":Commentary<CR>")
-  end
 end
 
 -- Ask a question about the current line or block
