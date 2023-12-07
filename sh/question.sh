@@ -23,7 +23,7 @@ question=$3
 filecontents=$(cat $filepath)
 fullprompt="$filecontents"$'\n\n'"That is my full code, here is a specific block:"$'\n\n'"$block"$'\n\n'"My question: $question?"
 
-sysmsg="You are helping an expert programmer understand code. Respond with technical language (but not code), the response will end up commented out in a code editor."
+sysmsg="You are helping an expert programmer understand code. Respond with technical language (but not code), the response will end up commented out in a code editor. Do not use multiline comments in your response."
 
 lm_command "$sysmsg" "$fullprompt"
 

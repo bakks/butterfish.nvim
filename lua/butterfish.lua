@@ -430,57 +430,6 @@ local p = function(str)
   vim.api.nvim_put({"", str}, 'c', { append = true }, true)
 end
 
-local get_function_range = function(symbol_name, callback)
-  vim.api.nvim_put({"getting function range"}, 'c', { append = true }, true)
-
-  local find_symbol
-  find_symbol = function(symbol)
-    if symbol.name == symbol_name then
-      return symbol
-    end
-
-    if symbol.children then
-      for _, child in ipairs(symbol.children) do
-        local found_symbol = find_symbol(child)
-        if found_symbol then
-          return found_symbol
-        end
-      end
-    end
-
-    return nil
-  end
-
-  local handler2 = function(err, result, _, _)
-    if err then
-      vim.api.nvim_err_writeln("Error when finding document symbols: " .. err.message)
-      return
-    end
-
-    if not result or vim.tbl_isempty(result) then
-      vim.api.nvim_err_writeln("No symbols found")
-      return
-    end
-
-    -- for each result, call find symbol, call calback if not null
-
-    for _, symbol in ipairs(result) do
-      sym = find_symbol(symbol)
-      if sym then
-        callback(sym)
-        return
-      end
-    end
-
-    callback(nil)
-  end
-
-  params = vim.lsp.util.make_position_params()
-  local bufnr = 0
-  params.textDocument.uri = vim.uri_from_bufnr(bufnr)
-  vim.lsp.buf_request(bufnr, 'textDocument/documentSymbol', params, handler2)
-end
-
 
 local hammer_step2 = function(status)
   if status == 0 then
@@ -505,65 +454,39 @@ local hammer_step2 = function(status)
   local filepath = vim.fn.expand("%:p")
   local filetype = vim.bo.filetype
   local command = basePath .. "hammer.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(hammerlog) .. "'"
-  local output = ""
   local found_function = false
+
+  -- write file to disk
+  vim.cmd("w")
+  script_output = ""
 
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(commentify(data), 'c', { append = true }, true)
-
-        output = output .. table.concat(data, "\n")
-
-        -- if the output matches a regex for the following then find
-        -- that function range with LSP, delete the range, then start
-        -- inserting the new function
-        -- pattern: edit_target("name": "foo", "planned_edit": "bar"})
-        if found_function == false then
-          matches = string.match(output, "edit_target%(%{%s*\"name\"%s*:%s*\"([^\"]+)\"%s*,%s*\"planned_edit\"%s*:%s*\"([^\"]+)\"%s*%}%)")
-
-          if matches ~= nil then
-          p(tostring(matches))
-            found_function = true
-            -- get the function name and planned edit
-            function_name = matches[1]
-            planned_edit = matches[2]
-
-            -- get the range of the function
-            get_function_range(function_name, function(symbol)
-              if symbol == nil then
-                vim.api.nvim_err_writeln("Could not find function: " .. function_name)
-                return
-              end
-              p("FOUND FUNCTION")
-              p(vim.inspect(symbol))
-              -- delete the range of the function
-              vim.api.nvim_buf_set_lines(0, symbol.range.start.line, symbol.range["end"].line, false, {})
-
-              -- insert the planned edit
-              vim.api.nvim_buf_set_lines(0, symbol.range.start.line, symbol.range.start.line, false, {planned_edit})
-            end)
-          end
-        end
-
+        script_output = script_output .. table.concat(data, "\n")
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(commentify(data), 'c', { append = true }, true)
-
-        output = output .. table.concat(data, "\n")
+        script_output = script_output .. table.concat(data, "\n")
       end)
     end,
 
     on_exit = function(job_id, exit_code, event_type)
+      vim.schedule(function()
+        -- reload file
+        vim.cmd("e!")
+        -- undojoin to group appends together for a single undo
+        vim.cmd("undojoin")
+        -- insert text at cursor position, don't adjust indent, move cursor to end
+        vim.api.nvim_put({"", "Hammer script exited with " .. exit_code}, 'c', { append = true }, true)
+        -- undojoin to group appends together for a single undo
+        vim.cmd("undojoin")
+        -- write script output to buffer
+        vim.api.nvim_put(commentify({script_output}), 'c', { append = true }, true)
+        reset_status_bar()
+      end)
     end,
   })
 end
