@@ -19,9 +19,39 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 filetype=$1
 codeblock=$2
-fullprompt="$codeblock"$'\n\n'"That is a block of $filetype code, your job is to implement the next block. For example if it ends with a function declaration, implement that function. If it ends half-way through a function, finish the function. Complete the code."
+fullprompt="I will give you a block of $filetype code, your job is to implement the next block. For example if it ends with a function declaration, implement that function. If it ends half-way through a function, finish the function, do not start a new block or function. Complete the code.
 
-sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports."
+\"\"\"
+$codeblock
+\"\"\"
+"
+
+sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports. Never repeat the code in the given block, only continue it.
+
+Here is an example, this is the block of code:
+\"\"\"
+// fibonacci generates a Fibonacci sequence up to the nth number
+func fibonacci(n int) []int {
+    // Initialize a slice to store the Fibonacci sequence
+    fibSeq := make([]int, n)
+\"\"\"
+
+Completion:
+    // Set the first two numbers of the sequence
+    fibSeq[0], fibSeq[1] = 0, 1
+
+    // Generate the rest of the sequence
+    for i := 2; i < n; i++ {
+        fibSeq[i] = fibSeq[i-1] + fibSeq[i-2]
+    }
+
+    // Return the generated Fibonacci sequence
+    return fibSeq
+}"
+
+
+
+
 
 lm_command "$sysmsg" "$fullprompt" gpt-4
 

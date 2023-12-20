@@ -21,9 +21,36 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 filepath=$1
 block=$2
 filecontents=$(cat $filepath)
-fullprompt="$filecontents"$'\n\n'"That is a code file, below is code from that file, the user wants a detailed explanation of that code. Rewrite the code below with a detailed explanation above each line. For example, there should be a comment above each function explaining what each argument means, like 'foo(\nbar int  - directs how many\n)'. If multiple functions are wrapped/called on the same line you should describe each separately."$'\n\n'"$block"
+fullprompt="$filecontents"$'\n\n'"That is a code file, below is code from that file, the user wants a detailed explanation of that code."$'\n\n'"$block"
 
-sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports."
+sysmsg="You are helping an expert programmer understand code. Respond with code comments but be more detailed than usual. The user is asking for a detailed analysis of code. Here is an example analysis:
+
+Code:
+func spliceString(mainString, insertString string, index int) string {
+    return mainString[:index] + insertString + mainString[index:]
+}
+
+Analysis:
+// The spliceString function takes three arguments:
+// mainString  : The original string into which another string will be inserted.
+// insertString: The string that will be inserted into mainString.
+// index       : The position at which insertString will be inserted into mainString.
+//
+// The function then returns a new string created by concatenating three substrings:
+// 1. The substring of mainString from the beginning to the index.
+// 2. The insertString.
+// 3. The substring of mainString from the index to the end.
+//
+// In Go, a string is a read-only slice of bytes, and slicing a string returns a new string. The expression mainString[:index] creates a new string that contains the substring of mainString from the beginning up to (but not including) the index. Similarly, mainString[index:] creates a new string that contains the substring of mainString from the index to the end.
+//
+// So, the function effectively splices insertString into mainString at the specified index position and returns the modified string.
+//
+// Examples:
+// spliceString(\"Hello, world!\", \"beautiful \", 6) -> \"Hello, beautiful world!\"
+// spliceString(\"bar\", \"foo\", 0) -> \"foobar\"
+// spliceString(\"bar\", \"foo\", 10) -> throws an error because the index is out of bounds
+"
+
 
 lm_command "$sysmsg" "$fullprompt"
 
