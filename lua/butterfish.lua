@@ -339,7 +339,7 @@ butterfish.implement = function()
   local filetype = vim.bo.filetype
   -- Get the 150 lines before the current line
   local context_start = math.max(0, line_number - 150)
-  local context_end = line_number - 1
+  local context_end = line_number
   local context_lines = vim.api.nvim_buf_get_lines(0, context_start, context_end, false)
   local context = table.concat(context_lines, "\n")
 
