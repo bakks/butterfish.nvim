@@ -19,7 +19,7 @@ This is a Neovim plugin for coding with language models. It depends on [Butterfi
 
 -   Get streaming code output in the current buffer
 -   Focus on writing code in a specific place rather than "chat with your codebase", no indexing / vectorization
--   Uses [Butterfish](https://butterfi.sh) as the LLM provider
+-   Uses OpenAI models through the [Butterfish](https://butterfi.sh) CLI
 -   LLM calls go through shell scripts so you can edit prompts and swap in other providers
 
 ### Relative to Copilot / Autocomplete
@@ -34,7 +34,7 @@ I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this p
 
 ### BFPrompt
 
--   **Command** : `:BFPrompt <prompt>`
+-   **Command**: `:BFPrompt <prompt>`
 -   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
 -   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
 -   **Context**: The current filetype is used (i.e. programming language), no other context is passed to the model.
@@ -42,15 +42,15 @@ I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this p
 
 ### BFFilePrompt
 
--   **Command** : `:BFFilePrompt <prompt>`
+-   **Command**: `:BFFilePrompt <prompt>`
 -   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
 -   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
 -   **Context**: The content of the current file is passed to the model.
--   **Script**: `prompt.sh 'filepath' 'prompt'`
+-   **Script**: `fileprompt.sh 'filepath' 'prompt'`
 
 ### BFRewrite
 
--   **Command** : `:BFRewrite <prompt>`
+-   **Command**: `:BFRewrite <prompt>`
 -   **Arguments**: A prompt describing how to rewrite the selected code
 -   **Description**: Comments out the currently selected code and rewrites it based on a prompt.
 -   **Context**: Operates on a block of lines. The command passes the range of selected lines and user prompt to the ai model along with the file type.
@@ -58,28 +58,28 @@ I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this p
 
 ### BFComment
 
--   **Command** : `:BFComment`
+-   **Command**: `:BFComment`
 -   **Description**: Adds a comment above the current line or block explaining it.
 -   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
 -   **Script**: `comment.sh 'filepath' 'codeblock'`
 
 ### BFExplain
 
--   **Command** : `:BFExplain`
+-   **Command**: `:BFExplain`
 -   **Description**: Explains a line or block of code in detail, for example, adds a comment above each line in a block of code.
 -   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
 -   **Script**: `explain.sh 'filepath' 'codeblock'`
 
 ### BFFix
 
--   **Command** : `:BFFix`
+-   **Command**: `:BFFix`
 -   **Description**: Attempts to fix an LSP error on the current line. Will comment out the current line and generate a new one.
 -   **Context**: Operates on a single line, but passes the preceding and succeeding 5 lines to the model to help provide context.
 -   **Script**: `explain.sh 'filetype' 'errormessage' 'errorblock'`
 
 ### BFImplement
 
--   **Command** : `:BFImplement`
+-   **Command**: `:BFImplement`
 -   **Description**: Like superpowered autocomplete, this attempts to complete whatever code you're writing, for example works well if you start it on a line with a function signature.
 -   **Context**: The command fetches the previous 150 lines and sends them to the ai model.
 -   **Script**: `implement.sh 'filetype' 'codeblock'`
