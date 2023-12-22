@@ -12,17 +12,25 @@ local color_to_change = "User1"
 local active_color = "197"
 
 local original_hl = ""
+local original_hl_toggle = false
 
 local set_status_bar = function()
+  if original_hl_toggle then
+    return
+  end
+
   -- get current highlight color
   original_hl = vim.api.nvim_get_hl_by_name(color_to_change, false).background
   -- set status bar to pink while running
   vim.cmd("hi " .. color_to_change .. " ctermbg=" .. active_color)
+
+  original_hl_toggle = true
 end
 
 local reset_status_bar = function()
   --reset status bar
   vim.cmd("hi " .. color_to_change .. " ctermbg=" .. original_hl)
+  original_hl_toggle = false
 end
 
 local run_command = function(command, callback)
@@ -392,6 +400,7 @@ local hammer_header = "butterfish::hammer"
 local hammer_original_window = nil
 local hammer_buffer = nil
 local hammer_window = nil
+local hammer_ttl = 0
 
 -- Function to create a new split window, create a buffer
 function hammer_create_split()
@@ -441,14 +450,15 @@ function hammer_append_line(text)
   hammer_append({text, ""})
 end
 
+local hammer_step1 = nil
 
+-- Hammer step two checks the output of the project hammer.sh script and
+-- if it has a nonzero exit then it runs the plugin hammer.sh script to
+-- invoke the LM
 local hammer_step2 = function(status)
   if status == 0 then
-    -- new line below
-    vim.schedule(function()
-      hammer_append("Hammer succeeded")
-    end)
     reset_status_bar()
+    hammer_append("Hammer succeeded")
     return
   end
 
@@ -486,15 +496,25 @@ local hammer_step2 = function(status)
         vim.api.nvim_set_current_win(hammer_original_window)
         vim.cmd("e!")
 
-        hammer_append("Hammer script exited with " .. exit_code)
-        reset_status_bar()
+        hammer_step1()
       end)
     end,
   })
 end
 
+-- Hammer step one locates the project's hammer.sh script and runs it
+hammer_step1 = function()
+  -- If TTL has hit 0 then stop
+  if hammer_ttl == 0 then
+    vim.schedule(function()
+      hammer_append("Hammer hit loop limit")
+      reset_status_bar()
+    end)
+    return
+  end
 
-local hammer_step1 = function()
+  hammer_ttl = hammer_ttl - 1
+
   set_status_bar()
 
   -- look for hammer.sh in the current directory and up
@@ -552,6 +572,7 @@ end
 --    explanation, and location (function level)
 --  - Send file content and fix plan to LM, ask to rewrite the function
 butterfish.hammer = function()
+  hammer_ttl = 5 -- Loop a max of 5 times
   hammer_create_split()
   hammer_append_line("Hammer mode started")
   hammer_step1()
