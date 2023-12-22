@@ -396,60 +396,80 @@ local commentify = function(data)
 end
 
 
-local hammer_header = "butterfish::hammer"
-local hammer_original_window = nil
-local hammer_buffer = nil
-local hammer_window = nil
-local hammer_ttl = 0
+-- Define a HammerContext class
+local SplitContext = {}
+SplitContext.__index = SplitContext
 
--- Function to create a new split window, create a buffer
-function hammer_create_split()
-  if hammer_buffer == nil then
+-- Constructor for SplitContext
+function SplitContext.new()
+  local self = setmetatable({}, SplitContext)
+  self.buffer = nil
+  self.window = nil
+  self.original_window = nil
+  return self
+end
+
+-- Create a new split window, create a buffer
+function SplitContext:create_split()
+  if self.buffer == nil then
     -- Create a new buffer and get its buffer number
-    hammer_buffer = vim.api.nvim_create_buf(false, true)
+    self.buffer = vim.api.nvim_create_buf(false, true)
   else
     -- Clear the buffer
-    vim.api.nvim_buf_set_lines(hammer_buffer, 0, -1, false, {})
+    vim.api.nvim_buf_set_lines(self.buffer, 0, -1, false, {})
   end
 
-  hammer_original_window = vim.api.nvim_get_current_win()
+  self.original_window = vim.api.nvim_get_current_win()
 
-  if hammer_window == nil or not vim.api.nvim_win_is_valid(hammer_window) then
+  if self.window == nil or not vim.api.nvim_win_is_valid(self.window) then
     -- Split the window horizontally with new split on the bottom
     vim.cmd("split")
     vim.cmd("wincmd J")
 
     -- Get the current window
-    hammer_window = vim.api.nvim_get_current_win()
+    self.window = vim.api.nvim_get_current_win()
 
     -- Set the current window's buffer to the new buffer
-    vim.api.nvim_win_set_buf(hammer_window, hammer_buffer)
+    vim.api.nvim_win_set_buf(self.window, self.buffer)
   end
-
 end
 
-function hammer_append(text)
-  if hammer_buffer == nil then
+-- Append text to the buffer
+function SplitContext:append(text)
+  if self.buffer == nil then
     return
   end
 
-  to_add = text
+  local to_add = text
 
   if type(text) == "string" then
     to_add = {text}
   end
 
-  -- switch to hammer window
-  vim.api.nvim_set_current_win(hammer_window)
+  -- Switch to hammer window
+  vim.api.nvim_set_current_win(self.window)
 
-  -- vim.api.nvim_put(to_add, 'c', { append = true }, true)
   vim.api.nvim_put(to_add, 'c', true, true)
 end
 
-function hammer_append_line(text)
-  hammer_append({text, ""})
+-- Append text as a new line in the buffer
+function SplitContext:append_line(text)
+  self:append({text, ""})
 end
 
+-- Switch to the hammer window
+function SplitContext:switch_to_window()
+  vim.api.nvim_set_current_win(self.window)
+end
+
+-- SplitContext method to switch back to the original window
+function SplitContext:switch_to_original_window()
+  vim.api.nvim_set_current_win(self.original_window)
+end
+
+
+local hammer_ttl = 0
+local hammer_split_context = nil
 local hammer_step1 = nil
 
 -- Hammer step two checks the output of the project hammer.sh script and
@@ -458,11 +478,11 @@ local hammer_step1 = nil
 local hammer_step2 = function(status)
   if status == 0 then
     reset_status_bar()
-    hammer_append("Hammer succeeded")
+    hammer_split_context:append("Hammer succeeded")
     return
   end
 
-  vim.api.nvim_set_current_win(hammer_original_window)
+  hammer_split_context:switch_to_original_window()
 
   -- write file to disk (the original buffer, not the hammer buffer)
   vim.cmd("w!")
@@ -472,7 +492,7 @@ local hammer_step2 = function(status)
   local filepath = vim.fn.expand("%:p")
   local filetype = vim.bo.filetype
 
-  vim.api.nvim_set_current_win(hammer_window)
+  hammer_split_context:switch_to_window()
 
   local command = basePath .. "hammer.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(hammerlog) .. "'"
   local found_function = false
@@ -480,20 +500,20 @@ local hammer_step2 = function(status)
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        hammer_append(data)
+        hammer_split_context:append(data)
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        hammer_append(data)
+        hammer_split_context:append(data)
       end)
     end,
 
     on_exit = function(job_id, exit_code, event_type)
       vim.schedule(function()
         -- swap back to original window and reload
-        vim.api.nvim_set_current_win(hammer_original_window)
+        hammer_split_context:switch_to_original_window()
         vim.cmd("e!")
 
         hammer_step1()
@@ -507,7 +527,7 @@ hammer_step1 = function()
   -- If TTL has hit 0 then stop
   if hammer_ttl == 0 then
     vim.schedule(function()
-      hammer_append("Hammer hit loop limit")
+      hammer_split_context:append("Hammer hit loop limit")
       reset_status_bar()
     end)
     return
@@ -533,17 +553,17 @@ hammer_step1 = function()
   -- The hammer script should return non-zero if there is more work
   -- and it should output debugging info, like build errors or test
   -- failures
-  local job_id = vim.fn.jobstart(hammer_script_path, {
+  vim.fn.jobstart(hammer_script_path, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        hammer_append(data)
+        hammer_split_context:append(data)
         hammerlog = hammerlog .. table.concat(data, "\n")
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        hammer_append(data)
+        hammer_split_context:append(data)
         hammerlog = hammerlog .. table.concat(data, "\n")
       end)
     end,
@@ -552,7 +572,7 @@ hammer_step1 = function()
       to_print = status_text
       vim.schedule(function()
         status_text = "status: " .. exit_code
-        hammer_append_line(status_text)
+        hammer_split_context:append_line(status_text)
         hammer_step2(exit_code)
       end)
     end,
@@ -573,9 +593,61 @@ end
 --  - Send file content and fix plan to LM, ask to rewrite the function
 butterfish.hammer = function()
   hammer_ttl = 5 -- Loop a max of 5 times
-  hammer_create_split()
-  hammer_append_line("Hammer mode started")
+
+  if hammer_split_context == nil then
+    hammer_split_context = SplitContext.new()
+  end
+
+  hammer_split_context:create_split()
+  hammer_split_context:append_line("Hammer mode started")
   hammer_step1()
+end
+
+edit_split = nil
+
+-- Function to edit the current buffer using LLM
+butterfish.edit = function(prompt)
+  -- Write the current buffer to disk
+  vim.cmd("w!")
+
+  -- Set status bar to indicate the operation
+  set_status_bar()
+
+  -- Get the current file path and file type
+  local filepath = vim.fn.expand("%:p")
+  local filetype = vim.bo.filetype
+
+  -- Create a command to send to the LLM for editing the current buffer
+  local command = basePath .. "edit.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(prompt) .. "'"
+
+  if edit_split == nil then
+    edit_split = SplitContext.new()
+  end
+  edit_split:create_split()
+  edit_split:append_line("Editing " .. filepath)
+
+  vim.fn.jobstart(command, {
+    on_stdout = function(job_id, data)
+      vim.schedule(function()
+        edit_split:append(data)
+      end)
+    end,
+
+    on_stderr = function(job_id, data)
+      vim.schedule(function()
+        edit_split:append(data)
+      end)
+    end,
+
+    on_exit = function(job_id, exit_code, event_type)
+      vim.schedule(function()
+        -- swap back to original window and reload
+        edit_split:switch_to_original_window()
+        vim.cmd("e!")
+        reset_status_bar()
+      end)
+    end,
+  })
 end
 
 -- Commands for each function
@@ -587,6 +659,7 @@ vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<li
 vim.cmd("command! -range -nargs=* BFQuestion :lua require'butterfish'.question(<line1>, <line2>, <q-args>)")
 vim.cmd("command! BFFix lua require'butterfish'.fix()")
 vim.cmd("command! BFImplement lua require'butterfish'.implement()")
+vim.cmd("command! -nargs=* BFEdit lua require'butterfish'.edit(<q-args>)")
 vim.cmd("command! BFHammer lua require'butterfish'.hammer()")
 
 return butterfish
