@@ -24,10 +24,10 @@ butterfish="$HOME/butterfish/bin/butterfish"
 parse_arguments() {
   filetype=$1
   filepath=$2
-  filecontents=$(cat $filepath)
   cursor=$3
   prompt=$4
 
+  filecontents=$(cat $filepath)
   # Use sed to get either the single line or the range of lines
   # change start-end to start,end
   cursor=$(echo $cursor | sed -e 's/-/,/')

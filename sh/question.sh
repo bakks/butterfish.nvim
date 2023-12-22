@@ -18,15 +18,11 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-filetype=$1
-filepath=$2
-block=$3
-question=$4
-filecontents=$(cat $filepath)
+parse_arguments "$@"
 
 fullprompt="$filecontents"
 
-if [ -z "$block" ]; then
+if [ -z "$fileblock" ]; then
   fullprompt="$fullprompt"
 else
   fullprompt="$fullprompt
@@ -34,7 +30,7 @@ else
 Here is a specific block of code I want to discuss:
 
 \"\"\"
-$block
+$fileblock
 \"\"\"
 "
 

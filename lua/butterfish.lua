@@ -298,18 +298,15 @@ end
 -- Args:
 --   start_range    start of visual line range
 --   end_range      end of visual line range
---   userPrompt     prompt to send to LLM
--- Script: rewrite.sh filetype selected_text prompt
-butterfish.rewrite = function(start_range, end_range, userPrompt)
-  local filetype = vim.bo.filetype
-  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
-  local selectedText = table.concat(lines, "\n")
-  local command = basePath .. "rewrite.sh " .. filetype .. " '" .. escape_code(selectedText) .. "' '" .. escape_code(userPrompt) .. "'"
-
-  comment_line_or_block(start_range, end_range)
+--   user_prompt     prompt to send to LLM
+butterfish.rewrite = function(start_range, end_range, user_prompt)
   move_down_to_clear_line(start_range, end_range)
 
-  run_command(command, clean_up_empty_lines)
+  butterfish.command("rewrite.sh", user_prompt, start_range, end_range, clean_up_empty_lines)
+
+  -- The above call is async, we put this after so that we comment out the block
+  -- after the file save but before any results are streamed back
+  comment_line_or_block(start_range, end_range)
 end
 
 -- Add a comment above the current line or block explaining it
@@ -331,14 +328,7 @@ end
 -- Ask a question about the current line or block
 -- This will move above the line or block and create a new line
 -- It will add "Question: <prompt>" to the new line and comment it out
--- Script: question.sh filepath selected_text prompt
 butterfish.question = function(start_range, end_range, user_prompt)
-  local filetype = vim.bo.filetype
-  local filepath = vim.fn.expand("%:p")
-  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
-  local selectedText = table.concat(lines, "\n")
-  local command = basePath .. "question.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(selectedText) .. "' '" .. escape_code(user_prompt) .. "'"
-
   move_up_to_clear_line(start_range, end_range)
 
   -- Add Question: <prompt> to the new line and comment it out
@@ -346,7 +336,7 @@ butterfish.question = function(start_range, end_range, user_prompt)
   comment_current_line()
   move_down_to_clear_line()
 
-  run_command(command)
+  butterfish.command("question.sh", user_prompt, start_range, end_range)
 end
 
 
@@ -361,7 +351,6 @@ end
 butterfish.fix = function()
   -- Get the current line number
   local line_number = vim.api.nvim_win_get_cursor(0)[1]
-  local filetype = vim.bo.filetype
 
   -- Safely retrieve the error message from line diagnostics
   local line_diagnostics = vim.lsp.diagnostic.get_line_diagnostics()
@@ -374,24 +363,13 @@ butterfish.fix = function()
   end
 
   -- Get the 5 lines before and after the current line
-  local context_start = math.max(0, line_number - 6)
+  local context_start = math.max(1, line_number - 6)
   local context_end = line_number + 5
-  local context_lines = vim.api.nvim_buf_get_lines(0, context_start, context_end, false)
-  local context = table.concat(context_lines, "\n")
-
-  -- Comment out the current line
-  -- Check if Commentary plugin is installed
-  if vim.fn.exists(":Commentary") then
-    keys("n", ":" .. line_number .. "Commentary<CR>")
-  end
 
   move_down_to_clear_line()
 
-  -- Create a command to send the error message to LLM
-  local command = basePath .. "fix.sh " .. filetype .. " '" .. escape_code(error_message) .. "' '" .. escape_code(context) .. "'"
-
-  -- Send the command to LLM and insert the response at the cursor
-  run_command(command)
+  butterfish.command("fix.sh", error_message, context_start, context_end)
+  comment_line_or_block(line_number, line_number)
 end
 
 -- Implement the next block of code based on the previous lines
