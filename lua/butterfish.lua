@@ -370,8 +370,6 @@ local find_hammer_script = function()
   end
 end
 
-local hammer_header = "butterfish::hammer"
-
 
 local commentify = function(data)
   -- Get the commentstring and extract the leader
@@ -389,48 +387,8 @@ local commentify = function(data)
   return data
 end
 
--- A function to convert an object/table to a string, even if it contains
--- nested tables
-local object_tree_to_string
-object_tree_to_string = function(object, indent)
-  -- If the object is a string, return it
-  if type(object) == "string" then
-    return object
-  end
 
-  -- If the object is a table, convert it to a string
-  if type(object) == "table" then
-    -- If the object is empty, return an empty string
-    if next(object) == nil then
-      return ""
-    end
-
-    -- If the object is a list, convert it to a string
-    if #object > 0 then
-      local string_list = {}
-      for _, value in ipairs(object) do
-        table.insert(string_list, object_tree_to_string(value, indent))
-      end
-      return table.concat(string_list, "\n")
-    end
-
-    -- If the object is a map, convert it to a string
-    local string_map = {}
-    for key, value in pairs(object) do
-      table.insert(string_map, key .. ": " .. object_tree_to_string(value, indent))
-    end
-    return table.concat(string_map, "\n")
-  end
-
-  -- If the object is not a string or a table, return an empty string
-  return ""
-end
-
-local p = function(str)
-  vim.api.nvim_put({"", str}, 'c', { append = true }, true)
-end
-
-
+local hammer_header = "butterfish::hammer"
 local hammer_original_window = nil
 local hammer_buffer = nil
 local hammer_window = nil
@@ -499,11 +457,8 @@ local hammer_step2 = function(status)
   -- write file to disk (the original buffer, not the hammer buffer)
   vim.cmd("w!")
 
-  -- Now we run the plugin hammer script, which preps and then runs
-  -- a double prompt, meaning first it asks for a fix plan, that
-  -- should return a function call, and it should reference a specific
-  -- function in this call. We find the appropriate and then rewrite
-  -- that given the output of the 2nd prompting
+  -- Now we run the plugin hammer script which asks the LM for a fix plan
+  -- based on the failure in the hammer.sh log
   local filepath = vim.fn.expand("%:p")
   local filetype = vim.bo.filetype
 
@@ -539,24 +494,8 @@ local hammer_step2 = function(status)
 end
 
 
-local hammer_step = function()
-  -- set formatoptions to ensure comment continues on next line with setlocal fo+=ro
-  vim.cmd("setlocal fo+=ro")
-
-  -- Comment the current line
-  move_down_to_clear_line()
-
-  keys("n", "i" .. hammer_header .. "<ESC>")
-
-  if vim.fn.exists(":Commentary") then
-    keys("n", ":Commentary<CR>")
-  end
-
-  -- new line below
-  keys("n", "o <ESC>")
-
+local hammer_step1 = function()
   set_status_bar()
-  local status = -1
 
   -- look for hammer.sh in the current directory and up
   local hammer_script_path = find_hammer_script()
@@ -614,8 +553,8 @@ end
 --  - Send file content and fix plan to LM, ask to rewrite the function
 butterfish.hammer = function()
   hammer_create_split()
-  hammer_append("Hammer mode started")
-  hammer_step()
+  hammer_append_line("Hammer mode started")
+  hammer_step1()
 end
 
 -- Commands for each function
