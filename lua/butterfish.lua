@@ -8,9 +8,9 @@
 
 local butterfish = {}
 local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
+
 local color_to_change = "User1"
 local active_color = "197"
-
 local original_hl = ""
 local original_hl_toggle = false
 
@@ -69,6 +69,105 @@ local run_command = function(command, callback)
   return job_id
 end
 
+-- Function to get line range based on mode
+local function get_line_range()
+  local mode = vim.api.nvim_get_mode().mode
+
+  if mode == 'n' then
+    -- In normal mode, return the current line number
+    return vim.api.nvim_win_get_cursor(0)[1]
+  elseif mode == 'v' then
+    -- In visual mode, return the selected range
+    local start_line = vim.fn.line("'<")
+    local end_line = vim.fn.line("'>")
+    return start_line .. "-" .. end_line
+  else
+    return "Unsupported mode"
+  end
+end
+
+
+-- Define a function that takes a text input and escapes single quotes by
+-- adding a backslash before them
+local escape_code = function(text)
+  return text:gsub("'", "\\'")
+end
+
+-- Call a command with the standard arguments, return the job id, call the
+-- callback when the job is done
+-- Args:
+--  command     name of the script to run
+--  userPrompt  prompt to send to LLM
+--  callback    function to call when the job is done
+-- Script: command.sh filetype filepath line_range prompt
+--  filetype    filetype of the current buffer
+--  filepath    full path of the current file
+--  line_range  line number or line range
+--  prompt      prompt to send to LLM
+--
+-- For example, to call the prompt.sh script:
+-- command("prompt.sh", "What is the meaning of life?", function() print("done") end)
+-- This will call the prompt.sh script like:
+--   prompt.sh go main.go 42 'What is the meaning of life?'
+butterfish.command = function(command, userPrompt, callback)
+  local filetype = vim.bo.filetype
+  local filepath = vim.fn.expand("%:p")
+  local line_range = get_line_range()
+
+  local shell_command = basePath ..
+    "/" .. command ..
+    " " .. filetype ..
+    " " .. filepath ..
+    " " .. line_range ..
+    " '" .. escape_code(userPrompt) .. "'"
+
+  set_status_bar()
+
+  -- write the current file to disk
+  vim.cmd("w!")
+  first = true
+
+  local job_id = vim.fn.jobstart(shell_command, {
+    on_stdout = function(job_id, data)
+      vim.schedule(function()
+        -- undojoin to prevent undoing the command
+        if not first then
+          vim.cmd("undojoin")
+        else
+          first = false
+        end
+        -- insert text at cursor position, don't adjust indent, move cursor to end
+        vim.api.nvim_put(data, 'c', true, true)
+      end)
+    end,
+
+    on_stderr = function(job_id, data)
+      vim.schedule(function()
+        -- undojoin to prevent undoing the command
+        if not first then
+          vim.cmd("undojoin")
+        else
+          first = false
+        end
+        -- insert text at cursor position, don't adjust indent, move cursor to end
+        vim.api.nvim_put(data, 'c', true, true)
+      end)
+    end,
+
+    on_exit = function(job_id, exit_code, event_type)
+      vim.schedule(function()
+        -- call callback now that the child process is done
+        if callback then
+          callback()
+        end
+        reset_status_bar()
+      end)
+    end,
+  })
+
+  return job_id
+end
+
 -- Define a function 'keys' that takes a single argument 'k'
 -- Use neovim API to feed keys to the user interface
 -- Convert the keycodes for visual mode end to ensure correct input
@@ -77,12 +176,6 @@ local keys = function(mode, k)
     vim.api.nvim_replace_termcodes(k, true, true, true), mode, true)
 end
 
-
--- Define a function that takes a text input and escapes single quotes by
--- adding a backslash before them
-local escape_code = function(text)
-  return text:gsub("'", "'\\''")
-end
 
 -- Remove empty lines from the cursor line up until the first non-empty line
 -- - Do a loop
@@ -205,17 +298,10 @@ end
 -- file as context
 -- Script: fileprompt.sh filepath prompt
 butterfish.file_prompt = function(userPrompt)
-  -- Get the current filetype of the buffer
-  local filetype = vim.bo.filetype
-  -- Get the full path of the current file
-  local filepath = vim.fn.expand("%:p")
-  -- Create a command by concatenating the base path, script name, file path, and escaped user prompt
-  local command = basePath .. "fileprompt.sh " .. filepath .. " '" .. escape_code(userPrompt) .. "'"
-
   move_down_to_clear_line()
 
-  -- Execute the command by passing it to the run_command function
-  run_command(command)
+  -- Execute the command
+  butterfish.command("fileprompt.sh", userPrompt)
 end
 
 -- Rewrite the selected text given instructions from the prompt
@@ -284,11 +370,7 @@ butterfish.question = function(start_range, end_range, user_prompt)
   -- Add Question: <prompt> to the new line and comment it out
   keys("n", "iQuestion: " .. user_prompt .. "<ESC>")
   comment_current_line()
-
   move_down_to_clear_line()
-
---  comment_current_line()
---  keys("n", "A<ESC>")
 
   run_command(command)
 end
@@ -654,8 +736,8 @@ butterfish.edit = function(prompt)
 end
 
 -- Commands for each function
-vim.cmd("command! -nargs=1 BFPrompt lua require'butterfish'.prompt(<q-args>)")
-vim.cmd("command! -nargs=1 BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
+vim.cmd("command! -nargs=* BFPrompt lua require'butterfish'.prompt(<q-args>)")
+vim.cmd("command! -nargs=* BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
 vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
 vim.cmd("command! -range -nargs=* BFComment :lua require'butterfish'.comment(<line1>, <line2>)")
 vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<line1>, <line2>)")
