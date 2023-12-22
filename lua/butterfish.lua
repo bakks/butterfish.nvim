@@ -133,7 +133,7 @@ local move_down_to_clear_line = function(start_range, end_range)
   -- If the line is not empty, create a new line below it and clear it out
   if line_text ~= nil and line_text ~= "" then
     -- Insert a new line below current line
-    keys("n", "A<CR><ESC>")
+    keys("n", "o<ESC>")
 
     -- Clear out the current line in case text like a comment was
     -- auto-inserted
@@ -266,15 +266,18 @@ butterfish.explain = function(start_range, end_range)
   run_command(command)
 end
 
+
+
 -- Ask a question about the current line or block
 -- This will move above the line or block and create a new line
 -- It will add "Question: <prompt>" to the new line and comment it out
 -- Script: question.sh filepath selected_text prompt
 butterfish.question = function(start_range, end_range, user_prompt)
+  local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
   local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
   local selectedText = table.concat(lines, "\n")
-  local command = basePath .. "question.sh " .. filepath .. " '" .. escape_code(selectedText) .. "' '" .. user_prompt .. "'"
+  local command = basePath .. "question.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(selectedText) .. "' '" .. escape_code(user_prompt) .. "'"
 
   move_up_to_clear_line(start_range, end_range)
 
@@ -282,10 +285,10 @@ butterfish.question = function(start_range, end_range, user_prompt)
   keys("n", "iQuestion: " .. user_prompt .. "<ESC>")
   comment_current_line()
 
-  -- Add Answer: to a new line below the current line
-  keys("n", "oAnswer:  <ESC>")
-  comment_current_line()
-  keys("n", "A<ESC>")
+  move_down_to_clear_line()
+
+--  comment_current_line()
+--  keys("n", "A<ESC>")
 
   run_command(command)
 end

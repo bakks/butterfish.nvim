@@ -2,6 +2,7 @@
 
 # question.sh
 # Arguments:
+#   - filetype: the programming language of the file, e.g. go, py, js
 #   - filepath: unix file path, can be relative
 #   - codeblock: code block to explain
 #   - question: question to ask
@@ -17,13 +18,38 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-filepath=$1
-block=$2
-question=$3
+filetype=$1
+filepath=$2
+block=$3
+question=$4
 filecontents=$(cat $filepath)
-fullprompt="$filecontents"$'\n\n'"That is my full code, here is a specific block:"$'\n\n'"$block"$'\n\n'"My question: $question?"
 
-sysmsg="You are helping an expert programmer understand code. Respond with technical language (but not code), the response will end up commented out in a code editor. Do not use multiline comments in your response."
+fullprompt="$filecontents"
+
+if [ -z "$block" ]; then
+  fullprompt="$fullprompt"
+else
+  fullprompt="$fullprompt
+
+Here is a specific block of code I want to discuss:
+
+\"\"\"
+$block
+\"\"\"
+"
+
+fi
+
+fullprompt="$fullprompt
+
+Here is my question: $question"
+
+sysmsg="You are helping an expert programmer understand code. Every line of your response should be commented for $filetype code. For example, with c code, every line would be prefixed with '//'.
+
+For example
+Here is my question: What is the return type?
+
+// Answer: The return type is int"
 
 lm_command "$sysmsg" "$fullprompt"
 
