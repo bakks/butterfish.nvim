@@ -20,15 +20,13 @@ filetype=$1
 filepath=$2
 hammerlog=$3
 
-prompt="This is a file of $filetype code, it has a problem. Your job is to edit it to fix the following build and test output:
+prompt="I'm editing $filetype code but getting a failure. The code is close to working, edit it based on what you think my intentions are and what would be correct and working code. For example, if the problem is a syntax error, attempt to fix the syntax problem with a minimum of changes. If the problem is a test failure, try to fix the code that is causing the test failure.
 
 \"\"\"
 $hammerlog
-\"\"\"
-
-In this step you can edit a specific function, call edit() to make a change."
+\"\"\""
 
 echo "Editing $filepath"
 
-$HOME/butterfish/bin/butterfish edit -vLi -m gpt-4-1106-preview -T 0.5 --no-color --no-backticks "$filepath" "$prompt"
+$butterfish edit -vLi -m gpt-4-1106-preview -T 0.5 --no-color --no-backticks "$filepath" "$prompt"
 
