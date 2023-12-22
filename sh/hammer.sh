@@ -20,9 +20,15 @@ filetype=$1
 filepath=$2
 hammerlog=$3
 
-sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports."
+prompt="This is a file of $filetype code, it has a problem. Your job is to edit it to fix the following build and test output:
 
-prompt="This is a file of $filetype code, it has a problem. Your job is to edit it to fix the following build and test output:\n$hammerlog\n\n. In this step you can edit a specific function, call edit() to make a change."
+\"\"\"
+$hammerlog
+\"\"\"
+
+In this step you can edit a specific function, call edit() to make a change."
+
+echo "Editing $filepath"
 
 $HOME/butterfish/bin/butterfish edit -vLi -m gpt-4-1106-preview -T 0.5 --no-color --no-backticks "$filepath" "$prompt"
 

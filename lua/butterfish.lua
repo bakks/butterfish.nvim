@@ -431,20 +431,73 @@ local p = function(str)
 end
 
 
+local hammer_original_window = nil
+local hammer_buffer = nil
+local hammer_window = nil
+
+-- Function to create a new split window, create a buffer
+function hammer_create_split()
+  if hammer_buffer == nil then
+    -- Create a new buffer and get its buffer number
+    hammer_buffer = vim.api.nvim_create_buf(false, true)
+  else
+    -- Clear the buffer
+    vim.api.nvim_buf_set_lines(hammer_buffer, 0, -1, false, {})
+  end
+
+  hammer_original_window = vim.api.nvim_get_current_win()
+
+  if hammer_window == nil or not vim.api.nvim_win_is_valid(hammer_window) then
+    -- Split the window horizontally with new split on the bottom
+    vim.cmd("split")
+    vim.cmd("wincmd J")
+
+    -- Get the current window
+    hammer_window = vim.api.nvim_get_current_win()
+
+    -- Set the current window's buffer to the new buffer
+    vim.api.nvim_win_set_buf(hammer_window, hammer_buffer)
+  end
+
+end
+
+function hammer_append(text)
+  if hammer_buffer == nil then
+    return
+  end
+
+  to_add = text
+
+  if type(text) == "string" then
+    to_add = {text}
+  end
+
+  -- switch to hammer window
+  vim.api.nvim_set_current_win(hammer_window)
+
+  -- vim.api.nvim_put(to_add, 'c', { append = true }, true)
+  vim.api.nvim_put(to_add, 'c', true, true)
+end
+
+function hammer_append_line(text)
+  hammer_append({text, ""})
+end
+
+
 local hammer_step2 = function(status)
   if status == 0 then
     -- new line below
     vim.schedule(function()
-      to_print = commentify({"", "Hammer succeeded"})
-      vim.api.nvim_put(to_print, 'c', { append = true }, true)
+      hammer_append("Hammer succeeded")
     end)
     reset_status_bar()
     return
   end
 
-  -- insert a new line below the current line
-  keys("n", "o <ESC>")
-  keys("n", "o <ESC>")
+  vim.api.nvim_set_current_win(hammer_original_window)
+
+  -- write file to disk (the original buffer, not the hammer buffer)
+  vim.cmd("w!")
 
   -- Now we run the plugin hammer script, which preps and then runs
   -- a double prompt, meaning first it asks for a fix plan, that
@@ -453,38 +506,32 @@ local hammer_step2 = function(status)
   -- that given the output of the 2nd prompting
   local filepath = vim.fn.expand("%:p")
   local filetype = vim.bo.filetype
+
+  vim.api.nvim_set_current_win(hammer_window)
+
   local command = basePath .. "hammer.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(hammerlog) .. "'"
   local found_function = false
-
-  -- write file to disk
-  vim.cmd("w")
-  script_output = ""
 
   local job_id = vim.fn.jobstart(command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        script_output = script_output .. table.concat(data, "\n")
+        hammer_append(data)
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        script_output = script_output .. table.concat(data, "\n")
+        hammer_append(data)
       end)
     end,
 
     on_exit = function(job_id, exit_code, event_type)
       vim.schedule(function()
-        -- reload file
+        -- swap back to original window and reload
+        vim.api.nvim_set_current_win(hammer_original_window)
         vim.cmd("e!")
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put({"", "Hammer script exited with " .. exit_code}, 'c', { append = true }, true)
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- write script output to buffer
-        vim.api.nvim_put(commentify({script_output}), 'c', { append = true }, true)
+
+        hammer_append("Hammer script exited with " .. exit_code)
         reset_status_bar()
       end)
     end,
@@ -530,20 +577,14 @@ local hammer_step = function()
   local job_id = vim.fn.jobstart(hammer_script_path, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(commentify(data), 'c', { append = true }, true)
+        hammer_append(data)
         hammerlog = hammerlog .. table.concat(data, "\n")
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(commentify(data), 'c', { append = true }, true)
+        hammer_append(data)
         hammerlog = hammerlog .. table.concat(data, "\n")
       end)
     end,
@@ -552,10 +593,7 @@ local hammer_step = function()
       to_print = status_text
       vim.schedule(function()
         status_text = "status: " .. exit_code
-        -- undojoin to group appends together for a single undo
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put({status_text}, 'c', { append = true }, true)
+        hammer_append_line(status_text)
         hammer_step2(exit_code)
       end)
     end,
@@ -575,6 +613,8 @@ end
 --    explanation, and location (function level)
 --  - Send file content and fix plan to LM, ask to rewrite the function
 butterfish.hammer = function()
+  hammer_create_split()
+  hammer_append("Hammer mode started")
   hammer_step()
 end
 
