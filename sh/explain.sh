@@ -2,8 +2,6 @@
 
 # explain.sh
 # Arguments:
-#   - filepath: unix file path, can be relative
-#   - codeblock: code block to explain
 # Output: Rewrites the given code with comments explaining each line, streams
 #         it to stdout
 # Example: ./explain.sh ./foo.go "func fibo(n int) int {\n"
@@ -17,11 +15,15 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-# accept the prompt as the first argument
-filepath=$1
-block=$2
-filecontents=$(cat $filepath)
-fullprompt="$filecontents"$'\n\n'"That is a code file, below is code from that file, the user wants a detailed explanation of that code."$'\n\n'"$block"
+parse_arguments "$@"
+
+fullprompt="$filecontents
+
+That is a code file, below is code from that file, the user wants a detailed explanation of that code.
+
+\"\"\"
+$fileblock
+\"\"\""
 
 sysmsg="You are helping an expert programmer understand code. Respond with code comments but be more detailed than usual. The user is asking for a detailed analysis of code. Here is an example analysis:
 
@@ -51,7 +53,5 @@ Analysis:
 // spliceString(\"bar\", \"foo\", 10) -> throws an error because the index is out of bounds
 "
 
-
 lm_command "$sysmsg" "$fullprompt"
-
 

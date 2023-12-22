@@ -70,26 +70,21 @@ local run_command = function(command, callback)
 end
 
 -- Function to get line range based on mode
-local function get_line_range()
-  local mode = vim.api.nvim_get_mode().mode
-
-  if mode == 'n' then
-    -- In normal mode, return the current line number
+local function get_line_range(range_start, range_end)
+  if range_start == nil or range_end == nil then
     return vim.api.nvim_win_get_cursor(0)[1]
-  elseif mode == 'v' then
-    -- In visual mode, return the selected range
-    local start_line = vim.fn.line("'<")
-    local end_line = vim.fn.line("'>")
-    return start_line .. "-" .. end_line
-  else
-    return "Unsupported mode"
   end
+
+  return range_start .. "-" .. range_end
 end
 
 
 -- Define a function that takes a text input and escapes single quotes by
 -- adding a backslash before them
 local escape_code = function(text)
+  if text == nil then
+    return ""
+  end
   return text:gsub("'", "\\'")
 end
 
@@ -97,7 +92,7 @@ end
 -- callback when the job is done
 -- Args:
 --  command     name of the script to run
---  userPrompt  prompt to send to LLM
+--  user_prompt  prompt to send to LLM
 --  callback    function to call when the job is done
 -- Script: command.sh filetype filepath line_range prompt
 --  filetype    filetype of the current buffer
@@ -109,17 +104,17 @@ end
 -- command("prompt.sh", "What is the meaning of life?", function() print("done") end)
 -- This will call the prompt.sh script like:
 --   prompt.sh go main.go 42 'What is the meaning of life?'
-butterfish.command = function(command, userPrompt, callback)
+butterfish.command = function(command, user_prompt, range_start, range_end, callback)
   local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
-  local line_range = get_line_range()
+  local line_range = get_line_range(range_start, range_end)
 
   local shell_command = basePath ..
     "/" .. command ..
     " " .. filetype ..
     " " .. filepath ..
     " " .. line_range ..
-    " '" .. escape_code(userPrompt) .. "'"
+    " '" .. escape_code(user_prompt) .. "'"
 
   set_status_bar()
 
@@ -280,28 +275,23 @@ local comment_current_line = function()
 end
 
 -- Enter an LLM prompt and write the response at the cursor
--- Script: prompt.sh
--- Args: filetype (language), prompt
-butterfish.prompt = function(userPrompt)
-  -- Get the current filetype of the buffer
-  local filetype = vim.bo.filetype
-  -- Create a command by concatenating the base path, script name, filetype, and escaped user prompt
-  local command = basePath .. "prompt.sh " .. filetype .. " '" .. escape_code(userPrompt) .. "'"
-
-  move_down_to_clear_line()
-
-  -- Execute the command by passing it to the run_command function
-  run_command(command)
-end
-
--- Enter an LLM prompt and write the response at the cursor, including the open
--- file as context
--- Script: fileprompt.sh filepath prompt
-butterfish.file_prompt = function(userPrompt)
+-- Args:
+--   user_prompt    prompt added by user from command, will be sent to LM
+butterfish.prompt = function(user_prompt)
   move_down_to_clear_line()
 
   -- Execute the command
-  butterfish.command("fileprompt.sh", userPrompt)
+  butterfish.command("prompt.sh", user_prompt)
+end
+
+-- Enter an LLM prompt and write the response at the cursor, including the open
+-- Args:
+--   user_prompt    prompt added by user from command, will be sent to LM
+butterfish.file_prompt = function(user_prompt)
+  move_down_to_clear_line()
+
+  -- Execute the command
+  butterfish.command("fileprompt.sh", user_prompt)
 end
 
 -- Rewrite the selected text given instructions from the prompt
@@ -323,35 +313,19 @@ butterfish.rewrite = function(start_range, end_range, userPrompt)
 end
 
 -- Add a comment above the current line or block explaining it
--- Args:
---  start_range    start of visual line range
---  end_range      end of visual line range
--- Script: comment.sh filepath selected_text
 butterfish.comment = function(start_range, end_range)
-  local filepath = vim.fn.expand("%:p")
-  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
-  local selectedText = table.concat(lines, "\n")
-  local command = basePath .. "comment.sh " .. filepath .. " '" .. escape_code(selectedText) .. "'"
-
-  move_up_to_clear_line(start_range, end_range)
-  run_command(command, clean_up_empty_lines)
+  move_up_to_clear_line()
+  butterfish.command("comment.sh", nil, start_range, end_range)
 end
 
 -- Explain a line or block of code in detail
 -- - If a single line, move up and create a newline like in butterfish.comment()
 -- - If a block, remove the block
 -- - Then call explain.sh
--- Script: explain.sh language selected_text
 butterfish.explain = function(start_range, end_range)
-  local filepath = vim.fn.expand("%:p")
-  local lines = vim.api.nvim_buf_get_lines(0, start_range - 1, end_range, false)
-  local selectedText = table.concat(lines, "\n")
-  local command = basePath .. "explain.sh " .. filepath .. " '" .. escape_code(selectedText) .. "'"
-
   move_up_to_clear_line(start_range, end_range)
-  run_command(command)
+  butterfish.command("explain.sh", nil, start_range, end_range)
 end
-
 
 
 -- Ask a question about the current line or block
