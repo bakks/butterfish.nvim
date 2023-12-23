@@ -582,9 +582,8 @@ end
 --  - Run hammer.sh, get the exit code and output
 --    - If exit code is 0, exit
 --  - Add / update hammer annotation
---  - Send file content and hammer.sh output to LM, ask for a fix plan,
---    explanation, and location (function level)
---  - Send file content and fix plan to LM, ask to rewrite the function
+--  - Send file content and hammer.sh output to LM, ask for fixes, returned and applied as LM tools
+--  - File is saved and reloaded
 butterfish.hammer = function()
   hammer_ttl = 5 -- Loop a max of 5 times
 

@@ -1,16 +1,19 @@
 #!/bin/bash
 
 # hammer.sh
+# Given output from a build or test command, attempt to fix the code
 # Arguments:
-#   - filetype: the programming language of the file, e.g. go, py, js
-#   - filepath: the path to the file to edit
-# Output: xxxx
-# Example: ./hammer.sh go foobar.go
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath, the path to the file to edit
+#   $3: cursor (not used)
+#   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+# Output: Edits the given code in place, streams LM communication to stdout
+# Example: ./hammer.sh go main.go 1 "Syntax error on line 10"
 # butterfish.nvim command: :BFHammer
 
 # This is a script for butterfish.nvim, it accepts arguments from the plugin
 # constructs language model prompts, and calls Butterfish to generate a response
-# using the OpenAI API. You can modify this script to change the prompt, or
+# using the OpenAI API. You can modify this script to change the prompt or
 # swap in a different language model.
 
 # Source common.sh from the same directory as this script

@@ -1,10 +1,14 @@
 #!/bin/bash
 
 # explain.sh
+# Generate a detailed explanation for a line or block of code
 # Arguments:
-# Output: Rewrites the given code with comments explaining each line, streams
-#         it to stdout
-# Example: ./explain.sh ./foo.go "func fibo(n int) int {\n"
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath, the path to the file to edit
+#   $3: cursor, either a line number (42) or a range (42-45)
+#   $4: prompt (not used)
+# Output: Streams a detailed explanation of the code to stdout, commented for the language
+# Example: ./explain.sh go ./foo.go 5-10
 # butterfish.nvim command: :BFExplain
 
 # This is a script for butterfish.nvim, it accepts arguments from the plugin

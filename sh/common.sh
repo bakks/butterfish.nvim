@@ -10,8 +10,8 @@ butterfish="$HOME/butterfish/bin/butterfish"
 # exec 2>&1
 
 # Parse the standard butterfish.nvim arguments:
-#   $1: filetype
-#   $2: filepath
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath, the path to the file to edit
 #   $3: cursor, either a line number (42) or a range (42-45)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
 # This function sets the following variables:

@@ -1,13 +1,16 @@
 #!/bin/bash
 
 # rewrite.sh
+# Given the content of a code file and a specific block of code from
+# that file, rewrite the block of code.
 # Arguments:
-#   - filetype: the programming language of the file, e.g. go, py, js
-#   - codeblock: code line/block to rewrite
-#   - prompt: instructions for rewriting the code
+#   $1: filetype
+#   $2: filepath
+#   $3: cursor, either a line number (42) or a range (42-45)
+#   $4: prompt, i.e. additional input, could be provided by the user or the plugin
 # Output: Rewrites the given code with comments explaining each line, streams
 #         it to stdout
-# Example: ./rewrite.sh go "a := 1 + 2 + 3 + 4.0" "Simplify this expression"
+# Example: ./rewrite.sh go ./main.go 5-10 "Simplify this function"
 # butterfish.nvim command: :BFRewrite <prompt>
 
 # This is a script for butterfish.nvim, it accepts arguments from the plugin

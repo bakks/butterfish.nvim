@@ -1,14 +1,20 @@
 #!/bin/bash
 
 # prompt.sh
+# Run a simple LM prompt, which requests output in a specific
+# programming language but does not provide any context.
 # Arguments:
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath (not used)
+#   $3: cursor (not used)
+#   $4: prompt, i.e. additional input, could be provided by the user or the plugin
 # Output: Streams a response by printing to stdout
-# Example: ./prompt.sh go "A function that returns a string 'hello world'"
+# Example: ./prompt.sh go ./main.go 30 "Add function that returns a string 'hello world'"
 # butterfish.nvim command: :BFPrompt <prompt>
 
 # This is a script for butterfish.nvim, it accepts arguments from the plugin
 # constructs language model prompts, and calls Butterfish to generate a response
-# using the OpenAI API. You can modify this script to change the prompt, or
+# using the OpenAI API. You can modify this script to change the prompt or
 # swap in a different language model.
 
 # Source common.sh from the same directory as this script

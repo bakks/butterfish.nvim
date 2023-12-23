@@ -1,13 +1,15 @@
 #!/bin/bash
 
 # question.sh
+# Ask a question about a line or block of code and get a natural
+# language response (but commented for the language).
 # Arguments:
-#   - filetype: the programming language of the file, e.g. go, py, js
-#   - filepath: unix file path, can be relative
-#   - codeblock: code block to explain
-#   - question: question to ask
+#   $1: filetype
+#   $2: filepath
+#   $3: cursor, either a line number (42) or a range (42-45)
+#   $4: prompt, i.e. additional input, could be provided by the user or the plugin
 # Output: Natural language response from the model to answer question
-# Example: ./explain.sh ./foo.go "func fibo(n int) int {\n" "What is the return type?"
+# Example: ./question.sh go ./foo.go 5-10 "What is the return type?"
 # butterfish.nvim command: :BFQuestion
 
 # This is a script for butterfish.nvim, it accepts arguments from the plugin
