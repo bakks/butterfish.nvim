@@ -33,42 +33,6 @@ local reset_status_bar = function()
   original_hl_toggle = false
 end
 
-local run_command = function(command, callback)
-  set_status_bar()
-
-  local job_id = vim.fn.jobstart(command, {
-    on_stdout = function(job_id, data)
-      vim.schedule(function()
-        -- undojoin to prevent undoing the command
-        vim.cmd("undojoin")
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(data, 'c', { append = true }, true)
-      end)
-    end,
-
-    on_stderr = function(job_id, data)
-      vim.schedule(function()
-        print("Job " .. job_id .. " errored with: ")
-        for key, value in pairs(data) do
-          print(key, value)
-        end
-      end)
-    end,
-
-    on_exit = function(job_id, exit_code, event_type)
-      vim.schedule(function()
-        -- call callback now that the child process is done
-        if callback then
-          callback()
-        end
-        reset_status_bar()
-      end)
-    end,
-  })
-
-  return job_id
-end
-
 -- Function to get line range based on mode
 local function get_line_range(range_start, range_end)
   if range_start == nil or range_end == nil then
@@ -85,7 +49,7 @@ local escape_code = function(text)
   if text == nil then
     return ""
   end
-  return text:gsub("'", "\\'")
+  return text:gsub("'", "'\\''")
 end
 
 -- Call a command with the standard arguments, return the job id, call the
@@ -378,20 +342,8 @@ end
 -- - Call implement.sh
 -- Script: implement.sh previous_lines
 butterfish.implement = function()
-  -- Get the current line number
-  local line_number = vim.api.nvim_win_get_cursor(0)[1]
-  -- Get the file type
-  local filetype = vim.bo.filetype
-  -- Get the 150 lines before the current line
-  local context_start = math.max(0, line_number - 150)
-  local context_end = line_number
-  local context_lines = vim.api.nvim_buf_get_lines(0, context_start, context_end, false)
-  local context = table.concat(context_lines, "\n")
-
-  local command = basePath .. "implement.sh " .. filetype .. " '" .. escape_code(context) .. "'"
-
   move_down_to_clear_line()
-  run_command(command)
+  butterfish.command("implement.sh", nil, context_end)
 end
 
 -- Locate a hammer.sh script and return the absolute path
@@ -531,7 +483,12 @@ local hammer_step2 = function(status)
 
   hammer_split_context:switch_to_window()
 
-  local command = basePath .. "hammer.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(hammerlog) .. "'"
+  local command = basePath .. "hammer.sh " ..
+    filetype .. " " ..
+    filepath .. " " ..
+    "1 " .. -- dummy line range
+    "'" .. escape_code(hammerlog) .. "'"
+
   local found_function = false
 
   local job_id = vim.fn.jobstart(command, {
@@ -655,7 +612,12 @@ butterfish.edit = function(prompt)
   local filetype = vim.bo.filetype
 
   -- Create a command to send to the LLM for editing the current buffer
-  local command = basePath .. "edit.sh " .. filetype .. " " .. filepath .. " '" .. escape_code(prompt) .. "'"
+  local command = basePath ..
+    "edit.sh " ..
+    filetype .. " " ..
+    filepath .. " " ..
+    "1 " .. -- dummy line range
+    "'" .. escape_code(prompt) .. "'"
 
   if edit_split == nil then
     edit_split = SplitContext.new()

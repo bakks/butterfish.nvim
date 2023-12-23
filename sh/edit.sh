@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# hammer.sh
+# edit.sh
 # Arguments:
 #   - filetype: the programming language of the file, e.g. go, py, js
 #   - filepath: the path to the file to edit
@@ -16,9 +16,7 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-filetype=$1
-filepath=$2
-prompt=$3
+parse_arguments "$@"
 
 model="gpt-4-1106-preview"
 temperature=0.5

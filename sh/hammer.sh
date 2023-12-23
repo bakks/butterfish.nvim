@@ -16,14 +16,12 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-filetype=$1
-filepath=$2
-hammerlog=$3
+parse_arguments "$@"
 
 prompt="I'm editing $filetype code but getting a failure. The code is close to working, edit it based on what you think my intentions are and what would be correct and working code. For example, if the problem is a syntax error, attempt to fix the syntax problem with a minimum of changes. If the problem is a test failure, try to fix the code that is causing the test failure.
 
 \"\"\"
-$hammerlog
+$prompt
 \"\"\""
 
 echo "Editing $filepath"
