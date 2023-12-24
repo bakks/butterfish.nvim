@@ -1,13 +1,10 @@
 #!/bin/bash
 
-# Specify the log file
+# default model used by lm_command, applies unless a 3rd argument is provided
 default_model="gpt-3.5-turbo-1106"
-butterfish="$HOME/butterfish/bin/butterfish"
 
-# Redirect all output to the log file
-# log_file="$HOME/script.log"
-# exec > >(tee -a ${log_file})
-# exec 2>&1
+# path to the butterfish binary, without an absolute path it must be in $PATH
+butterfish="butterfish"
 
 # Parse the standard butterfish.nvim arguments:
 #   $1: filetype, e.g. go, py, js
@@ -44,8 +41,6 @@ lm_command() {
   if [ -z "$model" ]; then
     model=$default_model
   fi
-  # echo $2 to log file
-  # echo "$2" >> ${log_file}
 
   $butterfish prompt -vL -m $model -T 0.5 --no-color --no-backticks -s "$1" -- "$2" < /dev/null
 }

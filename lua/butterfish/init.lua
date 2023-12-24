@@ -7,7 +7,14 @@
 -- a corresponding shell script which sets up the prompt and calls the LLM.
 
 local butterfish = {}
-local basePath = vim.fn.expand("$HOME") .. "/butterfish.nvim/sh/"
+
+-- get path to this script
+local function get_script_path()
+  local str = debug.getinfo(2, "S").source:sub(2)
+  return str:match("(.*/)")
+end
+
+local script_dir = get_script_path() .. "../../sh/"
 
 local color_to_change = "User1"
 local active_color = "197"
@@ -73,7 +80,7 @@ butterfish.command = function(command, user_prompt, range_start, range_end, call
   local filepath = vim.fn.expand("%:p")
   local line_range = get_line_range(range_start, range_end)
 
-  local shell_command = basePath ..
+  local shell_command = script_dir ..
     "/" .. command ..
     " " .. filetype ..
     " " .. filepath ..
@@ -483,7 +490,7 @@ local hammer_step2 = function(status)
 
   hammer_split_context:switch_to_window()
 
-  local command = basePath .. "hammer.sh " ..
+  local command = script_dir .. "hammer.sh " ..
     filetype .. " " ..
     filepath .. " " ..
     "1 " .. -- dummy line range
@@ -611,7 +618,7 @@ butterfish.edit = function(prompt)
   local filetype = vim.bo.filetype
 
   -- Create a command to send to the LLM for editing the current buffer
-  local command = basePath ..
+  local command = script_dir ..
     "edit.sh " ..
     filetype .. " " ..
     filepath .. " " ..
