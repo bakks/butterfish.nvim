@@ -7,6 +7,8 @@
 #   $2: filepath, the path to the file to edit
 #   $3: cursor, either a line number (42) or a range (42-45)
 #   $4: prompt (not used)
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Streams a detailed explanation of the code to stdout, commented for the language
 # Example: ./explain.sh go ./foo.go 5-10
 # butterfish.nvim command: :BFExplain

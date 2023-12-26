@@ -8,6 +8,8 @@
 #   $2: filepath, the path to the file to edit
 #   $3: cursor (not used)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Streams a response by printing to stdout
 # Example: ./fileprompt.sh go ./foo.go 30 "Add a function that returns a string 'hello world'"
 # butterfish.nvim command: :BFFilePrompt <prompt>
@@ -19,6 +21,8 @@
 
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+
+echo "Running fileprompt.sh"
 
 parse_arguments "$@"
 
@@ -33,5 +37,5 @@ Add the following code: $prompt"
 
 sysmsg="You are helping an expert programmer write code in $filetype. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports. Only respond with the requested addition, do not rewrite the entire file, for example if the user requests to add a function, respond with only that function."
 
-lm_command "$sysmsg" "$fullprompt" "gpt-4"
+lm_command "$sysmsg" "$fullprompt"
 

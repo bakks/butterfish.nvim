@@ -7,6 +7,8 @@
 #   $2: filepath, the path to the file to edit
 #   $3: cursor (not used)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Edits the given code in place, streams LM communication to stdout
 # Example: ./hammer.sh go main.go 1 "Syntax error on line 10"
 # butterfish.nvim command: :BFHammer
@@ -29,8 +31,7 @@ $prompt
 
 echo "Editing $filepath"
 
-model="gpt-4-1106-preview"
 temperature=0.5
 
-$butterfish edit -vLi -m "$model" -T "$temperature" --no-color --no-backticks "$filepath" "$prompt"
+$butterfish edit -vLi -m "$lm_model" -u "$lm_basepath" -T "$temperature" --no-color --no-backticks "$filepath" "$prompt"
 

@@ -8,6 +8,8 @@
 #   $2: filepath (not used)
 #   $3: cursor (not used)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Streams a response by printing to stdout
 # Example: ./prompt.sh go ./main.go 30 "Add function that returns a string 'hello world'"
 # butterfish.nvim command: :BFPrompt <prompt>

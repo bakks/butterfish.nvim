@@ -4,10 +4,12 @@
 # Ask a question about a line or block of code and get a natural
 # language response (but commented for the language).
 # Arguments:
-#   $1: filetype
-#   $2: filepath
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath, the path to the context file
 #   $3: cursor, either a line number (42) or a range (42-45)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Natural language response from the model to answer question
 # Example: ./question.sh go ./foo.go 5-10 "What is the return type?"
 # butterfish.nvim command: :BFQuestion

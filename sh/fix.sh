@@ -8,6 +8,8 @@
 #   $2: filepath, the path to the file to edit
 #   $3: cursor, either a line number (42) or a range (42-45)
 #   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Identifies an error in a block of code, rewrites the line in
 #        question, streams it to stdout
 # Example: ./fix.sh go ./main.go 2 "Syntax error on line 2"
@@ -31,4 +33,3 @@ That is a block of $filetype code, there is an error on the middle line. The err
 sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports."
 
 lm_command "$sysmsg" "$fullprompt"
-

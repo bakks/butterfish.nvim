@@ -8,16 +8,28 @@
 
 local butterfish = {}
 
+-- Default LM settings, these are passed to the LLM scripts, but note that
+-- the scripts can override these settings
+butterfish.lm_base_path = "https://api.openai.com/v1"
+butterfish.lm_fast_model = "gpt-3.5-turbo-1106"
+butterfish.lm_smart_model = "gpt-4-1106-preview"
+
+-- When running, Butterfish will record the current color and then run
+-- :hi [active_color_group] ctermbg=[active_color]
+-- This will be reset when the command is done
+butterfish.active_color_group = "User1"
+butterfish.active_color = "197"
+
 -- get path to this script
 local function get_script_path()
   local str = debug.getinfo(2, "S").source:sub(2)
   return str:match("(.*/)")
 end
 
-local script_dir = get_script_path() .. "../../sh/"
+-- Where to look for bash scripts that are used to call the LLM
+-- This can be customized to use your own scripts
+butterfish.script_dir = get_script_path() .. "../../sh/"
 
-local color_to_change = "User1"
-local active_color = "197"
 local original_hl = ""
 local original_hl_toggle = false
 
@@ -27,16 +39,16 @@ local set_status_bar = function()
   end
 
   -- get current highlight color
-  original_hl = vim.api.nvim_get_hl_by_name(color_to_change, false).background
+  original_hl = vim.api.nvim_get_hl_by_name(butterfish.active_color_group, false).background
   -- set status bar to pink while running
-  vim.cmd("hi " .. color_to_change .. " ctermbg=" .. active_color)
+  vim.cmd("hi " .. butterfish.active_color_group .. " ctermbg=" .. butterfish.active_color)
 
   original_hl_toggle = true
 end
 
 local reset_status_bar = function()
   --reset status bar
-  vim.cmd("hi " .. color_to_change .. " ctermbg=" .. original_hl)
+  vim.cmd("hi " .. butterfish.active_color_group .. " ctermbg=" .. original_hl)
   original_hl_toggle = false
 end
 
@@ -65,6 +77,8 @@ end
 --  command     name of the script to run
 --  user_prompt  prompt to send to LLM
 --  callback    function to call when the job is done
+--  model       model to use, if nil then use the default
+--  basepath    LM service URL, if nil then use the default
 -- Script: command.sh filetype filepath line_range prompt
 --  filetype    filetype of the current buffer
 --  filepath    full path of the current file
@@ -75,17 +89,28 @@ end
 -- command("prompt.sh", "What is the meaning of life?", function() print("done") end)
 -- This will call the prompt.sh script like:
 --   prompt.sh go main.go 42 'What is the meaning of life?'
-butterfish.command = function(command, user_prompt, range_start, range_end, callback)
+butterfish.command = function(
+  command, user_prompt, range_start, range_end, callback, model, basepath)
   local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
   local line_range = get_line_range(range_start, range_end)
 
-  local shell_command = script_dir ..
+  if model == nil then
+    model = butterfish.lm_fast_model
+  end
+
+  if basepath == nil then
+    basepath = butterfish.lm_base_path
+  end
+
+  local shell_command = butterfish.script_dir ..
     "/" .. command ..
     " " .. filetype ..
     " " .. filepath ..
     " " .. line_range ..
-    " '" .. escape_code(user_prompt) .. "'"
+    " '" .. escape_code(user_prompt) .. "'" ..
+    " '" .. model .. "'" ..
+    " '" .. basepath .. "'"
 
   set_status_bar()
 
@@ -252,7 +277,7 @@ butterfish.prompt = function(user_prompt)
   move_down_to_clear_line()
 
   -- Execute the command
-  butterfish.command("prompt.sh", user_prompt)
+  butterfish.command("prompt.sh", user_prompt, -1, -1, nil, butterfish.lm_smart_model)
 end
 
 -- Enter an LLM prompt and write the response at the cursor, including the open
@@ -262,7 +287,7 @@ butterfish.file_prompt = function(user_prompt)
   move_down_to_clear_line()
 
   -- Execute the command
-  butterfish.command("fileprompt.sh", user_prompt)
+  butterfish.command("fileprompt.sh", user_prompt, -1, -1, nil, butterfish.lm_smart_model)
 end
 
 -- Rewrite the selected text given instructions from the prompt
@@ -273,7 +298,7 @@ end
 butterfish.rewrite = function(start_range, end_range, user_prompt)
   move_down_to_clear_line(start_range, end_range)
 
-  butterfish.command("rewrite.sh", user_prompt, start_range, end_range, clean_up_empty_lines)
+  butterfish.command("rewrite.sh", user_prompt, start_range, end_range, clean_up_empty_lines, butterfish.lm_smart_model)
 
   -- The above call is async, we put this after so that we comment out the block
   -- after the file save but before any results are streamed back
@@ -339,7 +364,7 @@ butterfish.fix = function()
 
   move_down_to_clear_line()
 
-  butterfish.command("fix.sh", error_message, context_start, context_end)
+  butterfish.command("fix.sh", error_message, context_start, context_end, nil, butterfish.lm_smart_model)
   comment_line_or_block(line_number, line_number)
 end
 
@@ -375,24 +400,10 @@ local find_hammer_script = function()
 end
 
 
-local commentify = function(data)
-  -- Get the commentstring and extract the leader
-  local commentstring = vim.api.nvim_buf_get_option(0, 'commentstring')
-  local commentleader = string.match(commentstring, "^.*%%s")
-  commentleader = string.gsub(commentleader, "%%s", "")
-
-  -- if data is more than one line, add comment leader the later lines
-  if #data > 1 then
-    for i = 2, #data do
-      data[i] = commentleader .. data[i]
-    end
-  end
-
-  return data
-end
-
-
--- Define a HammerContext class
+-- SplitContext is a helper class for managing a split window and buffer
+-- It is used by the hammer mode to display the output of the hammer.sh script
+-- It opens a split with a new window and buffer at the bottom, then allows
+-- appending text to the buffer.
 local SplitContext = {}
 SplitContext.__index = SplitContext
 
@@ -490,11 +501,13 @@ local hammer_step2 = function(status)
 
   hammer_split_context:switch_to_window()
 
-  local command = script_dir .. "hammer.sh " ..
+  local command = butterfish.script_dir .. "hammer.sh " ..
     filetype .. " " ..
     filepath .. " " ..
-    "1 " .. -- dummy line range
-    "'" .. escape_code(hammerlog) .. "'"
+    "1" .. -- dummy line range
+    " '" .. escape_code(hammerlog) .. "'" ..
+    " '" .. butterfish.lm_smart_model .. "'" ..
+    " '" .. butterfish.lm_base_path .. "'"
 
   local found_function = false
 
@@ -618,12 +631,14 @@ butterfish.edit = function(prompt)
   local filetype = vim.bo.filetype
 
   -- Create a command to send to the LLM for editing the current buffer
-  local command = script_dir ..
+  local command = butterfish.script_dir ..
     "edit.sh " ..
     filetype .. " " ..
     filepath .. " " ..
-    "1 " .. -- dummy line range
-    "'" .. escape_code(prompt) .. "'"
+    "1" .. -- dummy line range
+    " '" .. escape_code(prompt) .. "'" ..
+    " '" .. butterfish.lm_smart_model .. "'" ..
+    " '" .. butterfish.lm_base_path .. "'"
 
   if edit_split == nil then
     edit_split = SplitContext.new()

@@ -1,10 +1,16 @@
 #!/bin/bash
 
 # implement.sh
+# Given a cursor position, complete the next code block (e.g. to the end
+# of a function, or the end of a loop)
 # Arguments:
-#   - filetype: the programming language of the file, e.g. go, py, js
-#   - codeblock: the code leading up to the block we want to implement
-# Output: Generates a block completion using GPT-4, meaning given preceding code
+#   $1: filetype, e.g. go, py, js
+#   $2: filepath, the path to the file to edit
+#   $3: cursor (not used)
+#   $4: prompt, i.e. additional input, could be provided by the user or the plugin
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
+# Output: Generates a block completion, meaning given preceding code
 #        it will generate the next block of code, streams it to stdout
 # Example: ./implement.sh go "func fibo(n int) int {\n"
 # butterfish.nvim command: :BFImplement
@@ -64,5 +70,5 @@ Completion:
 }"
 
 
-lm_command "$sysmsg" "$fullprompt" gpt-4
+lm_command "$sysmsg" "$fullprompt"
 

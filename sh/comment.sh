@@ -7,6 +7,8 @@
 #   $2: filepath, the path to the file to edit
 #   $3: cursor, either a line number (42) or a range (42-45)
 #   $4: prompt (not used)
+#   $5: model, the language model to use
+#   $6: base path, the base url for the language model, e.g. https://api.openai.com/v1
 # Output: Generates a comment appropriate for the code line/block in question,
 #        streams it to stdout
 # Example: ./comment.sh go ./foo.go 5-10

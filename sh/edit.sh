@@ -24,8 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 parse_arguments "$@"
 
-model="gpt-4-1106-preview"
 temperature=0.5
 
-$butterfish edit -vLi -m "$model" -T "$temperature" --no-color --no-backticks "$filepath" "$prompt"
+$butterfish edit -vLi -m "$lm_model" -u "$lm_basepath" -T "$temperature" --no-color --no-backticks "$filepath" "$prompt"
 
