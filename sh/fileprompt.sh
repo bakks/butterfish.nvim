@@ -22,8 +22,6 @@
 # Source common.sh from the same directory as this script
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-echo "Running fileprompt.sh"
-
 parse_arguments "$@"
 
 # accept the prompt as the first argument

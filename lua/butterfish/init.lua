@@ -277,7 +277,7 @@ butterfish.prompt = function(user_prompt)
   move_down_to_clear_line()
 
   -- Execute the command
-  butterfish.command("prompt.sh", user_prompt, -1, -1, nil, butterfish.lm_smart_model)
+  butterfish.command("prompt.sh", user_prompt, nil, nil, nil, butterfish.lm_smart_model)
 end
 
 -- Enter an LLM prompt and write the response at the cursor, including the open
@@ -287,7 +287,7 @@ butterfish.file_prompt = function(user_prompt)
   move_down_to_clear_line()
 
   -- Execute the command
-  butterfish.command("fileprompt.sh", user_prompt, -1, -1, nil, butterfish.lm_smart_model)
+  butterfish.command("fileprompt.sh", user_prompt, nil, nil, nil, butterfish.lm_smart_model)
 end
 
 -- Rewrite the selected text given instructions from the prompt
