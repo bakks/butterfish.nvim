@@ -31,12 +31,12 @@ num_context_lines=150
 # Calculate the block start by subtracting 150 from the cursor position
 block_start=$(($cursor - $num_context_lines))
 
-# If block_start is less than 0, set it to 0
-if (( block_start < 0 )); then
-  block_start=0
+# If block_start is less than 1, set it to 1
+if (( block_start < 1 )); then
+  block_start=1
 fi
 
-codeblock=$(sed -n "${block_start},${cursor}p" "$filepath")
+codeblock=$(sed -n "${block_start},${cursor}p" $filepath)
 
 
 fullprompt="I will give you a block of $filetype code, your job is to implement the next block. For example if it ends with a function declaration, implement that function. If it ends half-way through a function, finish the function, do not repeat the beginning of the code, do not start a new block or function. Complete the code.
