@@ -115,7 +115,7 @@ butterfish.command = function(
   set_status_bar()
 
   -- write the current file to disk
-  vim.cmd("w!")
+  vim.cmd("noautocmd w!")
   first = true
 
   local job_id = vim.fn.jobstart(shell_command, {
@@ -200,7 +200,9 @@ local clean_up_empty_lines = function()
   end
 end
 
--- Create empty line after current line or block
+-- If called with a range, move down to the end of the range, then if that
+-- line is not empty, create a new line below it and clear it out.
+-- If called without a range do that from the current cursor position.
 local move_down_to_clear_line = function(start_range, end_range)
   -- if a block
   if start_range ~= end_range then
@@ -219,13 +221,14 @@ local move_down_to_clear_line = function(start_range, end_range)
     -- Insert a new line below current line
     keys("n", "o<ESC>")
 
-    -- Clear out the current line in case text like a comment was
-    -- auto-inserted
+    -- Clear out the current line in case text like a comment was auto-inserted
     keys("n", "_d$<ESC>")
   end
 end
 
--- Create empty line before current line or block
+-- If called with a range, move up to the beginning of the range, then if that
+-- line is not empty, create a new line above it and clear it out.
+-- If called without a range do that from the current cursor position.
 local move_up_to_clear_line = function(start_range, end_range)
   -- if a block
   if start_range ~= end_range then
@@ -239,13 +242,12 @@ local move_up_to_clear_line = function(start_range, end_range)
   -- Get the text of the current line
   local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
 
-  -- If the line is not empty, create a new line below it and clear it out
+  -- If the line is not empty, create a new line above it and clear it out
   if line_text ~= nil and line_text ~= "" then
-    -- Insert a new line below current line
+    -- Insert a new line above current line
     keys("n", "O<ESC>")
 
-    -- Clear out the current line in case text like a comment was
-    -- auto-inserted
+    -- Clear out the current line in case text like a comment was auto-inserted
     keys("n", "_d$<ESC>")
   end
 end
@@ -492,7 +494,7 @@ local hammer_step2 = function(status)
   hammer_split_context:switch_to_original_window()
 
   -- write file to disk (the original buffer, not the hammer buffer)
-  vim.cmd("w!")
+  vim.cmd("noautocmd w!")
 
   -- Now we run the plugin hammer script which asks the LM for a fix plan
   -- based on the failure in the hammer.sh log
@@ -621,7 +623,7 @@ edit_split = nil
 -- Function to edit the current buffer using LLM
 butterfish.edit = function(prompt)
   -- Write the current buffer to disk
-  vim.cmd("w!")
+  vim.cmd("noautocmd w!")
 
   -- Set status bar to indicate the operation
   set_status_bar()
