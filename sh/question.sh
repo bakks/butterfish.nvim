@@ -42,7 +42,7 @@ fi
 
 fullprompt="$fullprompt
 
-Here is my question: $question"
+Here is my question: $prompt"
 
 sysmsg="You are helping an expert programmer understand code. Every line of your response should be commented for $filetype code. For example, with c code, every line would be prefixed with '//'.
 
