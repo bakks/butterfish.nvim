@@ -18,7 +18,8 @@ butterfish.lm_smart_model = "gpt-4-1106-preview"
 -- :hi [active_color_group] ctermbg=[active_color]
 -- This will be reset when the command is done
 butterfish.active_color_group = "User1"
-butterfish.active_color = "197"
+butterfish.active_color_cterm = "197"
+butterfish.active_color_gui = "#ff33cc"
 
 -- get path to this script
 local function get_script_path()
@@ -39,16 +40,19 @@ local set_status_bar = function()
   end
 
   -- get current highlight color
-  original_hl = vim.api.nvim_get_hl_by_name(butterfish.active_color_group, false).background
+  original_hl = vim.api.nvim_get_hl_by_name(butterfish.active_color_group, true)
+
   -- set status bar to pink while running
-  vim.cmd("hi " .. butterfish.active_color_group .. " ctermbg=" .. butterfish.active_color)
+  vim.cmd("hi " .. butterfish.active_color_group ..
+    " ctermbg=" .. butterfish.active_color_cterm ..
+    " guibg=" .. butterfish.active_color_gui)
 
   original_hl_toggle = true
 end
 
 local reset_status_bar = function()
   --reset status bar
-  vim.cmd("hi " .. butterfish.active_color_group .. " ctermbg=" .. original_hl)
+  vim.api.nvim_set_hl(0, butterfish.active_color_group, original_hl)
   original_hl_toggle = false
 end
 
