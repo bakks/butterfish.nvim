@@ -26,5 +26,22 @@ parse_arguments "$@"
 
 sysmsg="You are helping an expert programmer write code. Respond only with code, add succinct comments above functions and other important parts. Assume the code will be within an existing file, so don't respond with the package name or imports. Assume the programming language is $filetype"
 
-lm_command "$sysmsg" "$prompt"
+attention_note=""
+
+if [ -n "$fileblock" ]; then
+  attention_note="$fullprompt
+
+Pay attention to the following code:
+\"\"\"
+$fileblock
+\"\"\""
+fi
+
+# accept the prompt as the first argument
+fullprompt="
+$attention_note
+
+Add the following code: $prompt"
+
+lm_command "$sysmsg" "$fullprompt"
 

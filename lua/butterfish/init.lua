@@ -278,33 +278,56 @@ end
 
 -- Enter an LLM prompt and write the response at the cursor
 -- Args:
+--   start_range    start of visual line range
+--   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
-butterfish.prompt = function(user_prompt)
-  move_down_to_clear_line()
+butterfish.prompt = function(start_range, end_range, user_prompt)
+  move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
-  butterfish.command("prompt.sh", user_prompt, nil, nil, nil, butterfish.lm_smart_model)
+  butterfish.command(
+    "prompt.sh",
+    user_prompt,
+    start_range,
+    end_range,
+    nil,
+    butterfish.lm_smart_model)
 end
 
 -- Enter an LLM prompt and write the response at the cursor, including the open
 -- Args:
+--   start_range    start of visual line range
+--   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
-butterfish.file_prompt = function(user_prompt)
-  move_down_to_clear_line()
+butterfish.file_prompt = function(start_range, end_range, user_prompt)
+  move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
-  butterfish.command("fileprompt.sh", user_prompt, nil, nil, nil, butterfish.lm_smart_model)
+  butterfish.command(
+    "fileprompt.sh",
+    user_prompt,
+    start_range,
+    end_range,
+    nil,
+    butterfish.lm_smart_model)
 end
+
 
 -- Rewrite the selected text given instructions from the prompt
 -- Args:
 --   start_range    start of visual line range
 --   end_range      end of visual line range
---   user_prompt     prompt to send to LLM
+--   user_prompt    prompt to send to LLM
 butterfish.rewrite = function(start_range, end_range, user_prompt)
   move_down_to_clear_line(start_range, end_range)
 
-  butterfish.command("rewrite.sh", user_prompt, start_range, end_range, clean_up_empty_lines, butterfish.lm_smart_model)
+  butterfish.command(
+    "rewrite.sh",
+    user_prompt,
+    start_range,
+    end_range,
+    clean_up_empty_lines,
+    butterfish.lm_smart_model)
 
   -- The above call is async, we put this after so that we comment out the block
   -- after the file save but before any results are streamed back
@@ -677,8 +700,8 @@ butterfish.edit = function(prompt)
 end
 
 -- Commands for each function
-vim.cmd("command! -nargs=* BFPrompt lua require'butterfish'.prompt(<q-args>)")
-vim.cmd("command! -nargs=* BFFilePrompt lua require'butterfish'.file_prompt(<q-args>)")
+vim.cmd("command! -range -nargs=* BFPrompt :lua require'butterfish'.prompt(<line1>, <line2>, <q-args>)")
+vim.cmd("command! -range -nargs=* BFFilePrompt :lua require'butterfish'.file_prompt(<line1>, <line2>, <q-args>)")
 vim.cmd("command! -range -nargs=* BFRewrite :lua require'butterfish'.rewrite(<line1>, <line2>, <q-args>)")
 vim.cmd("command! -range -nargs=* BFComment :lua require'butterfish'.comment(<line1>, <line2>)")
 vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<line1>, <line2>)")

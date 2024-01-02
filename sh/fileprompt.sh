@@ -24,12 +24,24 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 parse_arguments "$@"
 
+attention_note=""
+
+if [ -n "$fileblock" ]; then
+  attention_note="$fullprompt
+
+Pay particular attention to the following code:
+\"\"\"
+$fileblock
+\"\"\""
+fi
+
 # accept the prompt as the first argument
 fullprompt="Here is my code:
 
 \"\"\"
 $filecontents
 \"\"\"
+$attention_note
 
 Add the following code: $prompt"
 
