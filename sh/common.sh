@@ -43,13 +43,23 @@ parse_arguments() {
 #  - $3 (optional): the LM model, defaults to gpt-3.5-turbo-1106
 #  - $4 (optional): the LM basepath, defaults to https://api.openai.com/v1
 lm_command() {
-  model=$3
+  model=$3 # first check model argument to this function
   if [ -z "$model" ]; then
+    # if model arg is empty, check script argument
+    model=$lm_model
+  fi
+  if [ -z "$model" ]; then
+    # if script argument is empty, use default
     model=$default_model
   fi
 
-  basepath=$4
+  basepath=$4 # first check basepath argument to this function
   if [ -z "$basepath" ]; then
+    # if basepath arg is empty, check script argument
+    basepath=$lm_basepath
+  fi
+  if [ -z "$basepath" ]; then
+    # if script argument is empty, use default
     basepath=$default_basepath
   fi
 
