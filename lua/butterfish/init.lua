@@ -15,7 +15,7 @@ butterfish.lm_fast_model = "gpt-3.5-turbo-1106"
 butterfish.lm_smart_model = "gpt-4-1106-preview"
 
 -- When running, Butterfish will record the current color and then run
--- :hi [active_color_group] ctermbg=[active_color]
+-- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
 -- This will be reset when the command is done
 butterfish.active_color_group = "User1"
 butterfish.active_color_cterm = "197"
@@ -29,7 +29,7 @@ end
 
 -- Where to look for bash scripts that are used to call the LLM
 -- This can be customized to use your own scripts
-butterfish.script_dir = get_script_path() .. "../../sh/"
+butterfish.script_dir = get_script_path() .. "../../bin/"
 
 local original_hl = ""
 local original_hl_toggle = false
@@ -77,22 +77,26 @@ end
 
 -- Call a command with the standard arguments, return the job id, call the
 -- callback when the job is done
+--
 -- Args:
 --  command     name of the script to run
 --  user_prompt  prompt to send to LLM
 --  callback    function to call when the job is done
 --  model       model to use, if nil then use the default
 --  basepath    LM service URL, if nil then use the default
--- Script: command.sh filetype filepath line_range prompt
+--
+-- Script: command filetype filepath line_range prompt
 --  filetype    filetype of the current buffer
 --  filepath    full path of the current file
 --  line_range  line number or line range
 --  prompt      prompt to send to LLM
+--  model       model to use, if nil then use the default
+--  basepath    LM service URL, if nil then use the default
 --
 -- For example, to call the prompt.sh script:
--- command("prompt.sh", "What is the meaning of life?", function() print("done") end)
+-- command("prompt", "What is the meaning of life?", function() print("done") end)
 -- This will call the prompt.sh script like:
---   prompt.sh go main.go 42 'What is the meaning of life?'
+--   prompt go main.go 42 'What is the meaning of life?'
 butterfish.command = function(
   command, user_prompt, range_start, range_end, callback, model, basepath)
   local filetype = vim.bo.filetype
@@ -286,7 +290,7 @@ butterfish.prompt = function(start_range, end_range, user_prompt)
 
   -- Execute the command
   butterfish.command(
-    "prompt.sh",
+    "prompt",
     user_prompt,
     start_range,
     end_range,
@@ -304,7 +308,7 @@ butterfish.file_prompt = function(start_range, end_range, user_prompt)
 
   -- Execute the command
   butterfish.command(
-    "fileprompt.sh",
+    "fileprompt",
     user_prompt,
     start_range,
     end_range,
@@ -322,7 +326,7 @@ butterfish.rewrite = function(start_range, end_range, user_prompt)
   move_down_to_clear_line(start_range, end_range)
 
   butterfish.command(
-    "rewrite.sh",
+    "rewrite",
     user_prompt,
     start_range,
     end_range,
@@ -337,16 +341,16 @@ end
 -- Add a comment above the current line or block explaining it
 butterfish.comment = function(start_range, end_range)
   move_up_to_clear_line()
-  butterfish.command("comment.sh", nil, start_range, end_range)
+  butterfish.command("comment", nil, start_range, end_range)
 end
 
 -- Explain a line or block of code in detail
 -- - If a single line, move up and create a newline like in butterfish.comment()
 -- - If a block, remove the block
--- - Then call explain.sh
+-- - Then call explain
 butterfish.explain = function(start_range, end_range)
   move_up_to_clear_line(start_range, end_range)
-  butterfish.command("explain.sh", nil, start_range, end_range)
+  butterfish.command("explain", nil, start_range, end_range)
 end
 
 
@@ -361,7 +365,7 @@ butterfish.question = function(start_range, end_range, user_prompt)
   comment_current_line()
   move_down_to_clear_line()
 
-  butterfish.command("question.sh", user_prompt, start_range, end_range)
+  butterfish.command("question", user_prompt, start_range, end_range)
 end
 
 
@@ -372,7 +376,6 @@ end
 -- - Adds a new line below the current line
 -- - Sends the error message to LLM
 -- - Inserts the response at the cursor
--- Script: fix.sh filepath error_message
 butterfish.fix = function()
   -- Get the current line number
   local line_number = vim.api.nvim_win_get_cursor(0)[1]
@@ -393,24 +396,23 @@ butterfish.fix = function()
 
   move_down_to_clear_line()
 
-  butterfish.command("fix.sh", error_message, context_start, context_end, nil, butterfish.lm_smart_model)
+  butterfish.command("fix", error_message, context_start, context_end, nil, butterfish.lm_smart_model)
   comment_line_or_block(line_number, line_number)
 end
 
 -- Implement the next block of code based on the previous lines
 -- - Get the current line number
 -- - Get the previous 150 lines
--- - Call implement.sh
--- Script: implement.sh previous_lines
+-- - Call implement
 butterfish.implement = function()
   move_down_to_clear_line()
-  butterfish.command("implement.sh", nil, context_end)
+  butterfish.command("implement", nil, context_end)
 end
 
--- Locate a hammer.sh script and return the absolute path
--- Start in the current directory and move up until we find a hammer.sh script
+-- Locate a hammer script and return the absolute path
+-- Start in the current directory and move up until we find a hammer script
 local find_hammer_script = function()
-  local hammer_script = "hammer.sh"
+  local hammer_script = "hammer"
   local current_dir = vim.fn.expand("%:p:h")
   local hammer_script_path = current_dir .. "/" .. hammer_script
 
@@ -430,7 +432,7 @@ end
 
 
 -- SplitContext is a helper class for managing a split window and buffer
--- It is used by the hammer mode to display the output of the hammer.sh script
+-- It is used by the hammer mode to display the output of the hammer script
 -- It opens a split with a new window and buffer at the bottom, then allows
 -- appending text to the buffer.
 local SplitContext = {}
@@ -509,7 +511,7 @@ local hammer_split_context = nil
 local hammer_step1 = nil
 
 -- Hammer step two checks the output of the project hammer.sh script and
--- if it has a nonzero exit then it runs the plugin hammer.sh script to
+-- if it has a nonzero exit then it runs the plugin hammer script to
 -- invoke the LM
 local hammer_step2 = function(status)
   if status == 0 then
@@ -530,7 +532,7 @@ local hammer_step2 = function(status)
 
   hammer_split_context:switch_to_window()
 
-  local command = butterfish.script_dir .. "hammer.sh " ..
+  local command = butterfish.script_dir .. "hammer " ..
     filetype .. " " ..
     filepath .. " " ..
     "1" .. -- dummy line range
@@ -661,7 +663,7 @@ butterfish.edit = function(prompt)
 
   -- Create a command to send to the LLM for editing the current buffer
   local command = butterfish.script_dir ..
-    "edit.sh " ..
+    "edit " ..
     filetype .. " " ..
     filepath .. " " ..
     "1" .. -- dummy line range

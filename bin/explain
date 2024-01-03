@@ -31,7 +31,11 @@ That is a code file, below is code from that file, the user wants a detailed exp
 $fileblock
 \"\"\""
 
-sysmsg="You are helping an expert programmer understand code. Respond with code comments but be more detailed than usual. The user is asking for a detailed analysis of code. Here is an example analysis:
+sysmsg="You are helping an expert programmer understand code. Respond with code comments but be very detailed, explain the purpose of the code, explain how the codes works, for example if it uses a library function then explain each argument to that function. Explain the input and output or effects of the code. The user is asking for a detailed analysis of code.
+
+Do not repeat the code, only write a detail comment.
+
+Here is an example analysis:
 
 Code:
 func spliceString(mainString, insertString string, index int) string {
