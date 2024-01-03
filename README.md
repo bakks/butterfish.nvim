@@ -51,11 +51,10 @@ butterfish prompt "test"
 
 The second line will ask for an [OpenAI API key](https://platform.openai.com/api-keys).
 
-Then install the butterfish.nvim plugin using your plugin manager, this is the installation with [vim-plug](https://github.com/junegunn/vim-plug):
+Then install the butterfish.nvim plugin using your plugin manager, this is the installation with [lazy.nvim](https://github.com/folke/lazy.nvim).
 
-```vim
-Plug 'bakks/butterfish.nvim'
-Plug 'tpope/vim-commentary' " this is a dependency
+```lua
+{'bakks/butterfish.nvim', dependencies = {'tpope/vim-commentary'}},
 ```
 
 Note the dependency on [vim-commentary](https://github.com/tpope/vim-commentary).
@@ -65,19 +64,19 @@ Now load butterfish.nvim and set up some key bindings:
 ```lua
 local butterfish = require('butterfish')
 local opts = {noremap = true, silent = true}
-vim.api.nvim_set_keymap('n', ',p', ':BFFilePrompt ',   opts)
-vim.api.nvim_set_keymap('n', ',r', ':BFRewrite ',      opts)
-vim.api.nvim_set_keymap('v', ',r', ':BFRewrite ',      opts)
-vim.api.nvim_set_keymap('n', ',c', ':BFComment<CR>',   opts)
-vim.api.nvim_set_keymap('v', ',c', ':BFComment<CR>',   opts)
-vim.api.nvim_set_keymap('n', ',e', ':BFExplain<CR>',   opts)
-vim.api.nvim_set_keymap('v', ',e', ':BFExplain<CR>',   opts)
-vim.api.nvim_set_keymap('n', ',f', ':BFFix<CR>',       opts)
-vim.api.nvim_set_keymap('n', ',i', ':BFImplement<CR>', opts)
-vim.api.nvim_set_keymap('n', ',d', ':BFEdit ',         opts)
-vim.api.nvim_set_keymap('n', ',h', ':BFHammer<CR>',    opts)
-vim.api.nvim_set_keymap('n', ',q', ':BFQuestion ',     opts)
-vim.api.nvim_set_keymap('v', ',q', ':BFQuestion ',     opts)
+vim.keymap.set('n', ',p', ':BFFilePrompt ',   opts)
+vim.keymap.set('n', ',r', ':BFRewrite ',      opts)
+vim.keymap.set('v', ',r', ':BFRewrite ',      opts)
+vim.keymap.set('n', ',c', ':BFComment<CR>',   opts)
+vim.keymap.set('v', ',c', ':BFComment<CR>',   opts)
+vim.keymap.set('n', ',e', ':BFExplain<CR>',   opts)
+vim.keymap.set('v', ',e', ':BFExplain<CR>',   opts)
+vim.keymap.set('n', ',f', ':BFFix<CR>',       opts)
+vim.keymap.set('n', ',i', ':BFImplement<CR>', opts)
+vim.keymap.set('n', ',d', ':BFEdit ',         opts)
+vim.keymap.set('n', ',h', ':BFHammer<CR>',    opts)
+vim.keymap.set('n', ',q', ':BFQuestion ',     opts)
+vim.keymap.set('v', ',q', ':BFQuestion ',     opts)
 ```
 
 These keybinds will for example start a new prompt when you type `,p`, i.e. start the command, with the expectation you will type a prompt and then press Enter.
