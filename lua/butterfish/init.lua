@@ -123,7 +123,7 @@ butterfish.command = function(
   set_status_bar()
 
   -- write the current file to disk
-  vim.cmd("noautocmd w!")
+  vim.cmd("silent noautocmd w!")
   first = true
 
   local job_id = vim.fn.jobstart(shell_command, {
@@ -523,7 +523,7 @@ local hammer_step2 = function(status)
   hammer_split_context:switch_to_original_window()
 
   -- write file to disk (the original buffer, not the hammer buffer)
-  vim.cmd("noautocmd w!")
+  vim.cmd("silent noautocmd w!")
 
   -- Now we run the plugin hammer script which asks the LM for a fix plan
   -- based on the failure in the hammer.sh log
@@ -652,7 +652,7 @@ edit_split = nil
 -- Function to edit the current buffer using LLM
 butterfish.edit = function(prompt)
   -- Write the current buffer to disk
-  vim.cmd("noautocmd w!")
+  vim.cmd("silent noautocmd w!")
 
   -- Set status bar to indicate the operation
   set_status_bar()
