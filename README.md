@@ -1,6 +1,6 @@
 # 🐠 butterfish.nvim
 
-Write code in Neovim with robots
+A Neovim plugin for fluently using language models
 
 [![Website](https://img.shields.io/badge/website-https://butterfi.sh-blue)](https://butterfi.sh) [![Latest Version](https://img.shields.io/github/v/release/bakks/butterfish.nvim)](https://github.com/bakks/butterfish.nvim/releases) [![@pbbakkum](https://img.shields.io/badge/Updates%20at-%20%40pbbakkum-blue?style=flat&logo=twitter)](https://twitter.com/pbbakkum)
 
@@ -11,7 +11,7 @@ This is a Neovim plugin for coding with language models. It depends on [Butterfi
 -   Prompt for a block of code (`:BFFilePrompt`)
 -   Rewrite a block of code with given instructions (`:BFRewrite`)
 -   Add a comment over a block of code (`:BFComment`)
--   Deeply explain a block of code with comments over each line (`:BFExplain`)
+-   Deeply explain a block of code (`:BFExplain`)
 -   Fix an error (given by LSP) (`:BFFix`)
 -   Implement a block based on preceding code (`:BFImplement`)
 -   General question/answer (`:BFQuestion`)
@@ -23,7 +23,7 @@ This is a Neovim plugin for coding with language models. It depends on [Butterfi
 -   Get streaming code output in the current buffer
 -   Focus on writing code in a specific place rather than "chat with your codebase", no indexing / vectorization
 -   Uses OpenAI models through the [Butterfish](https://butterfi.sh) CLI
--   LLM calls go through shell scripts so you can edit prompts and swap in other providers
+-   LLM calls go through shell scripts so you can edit prompts and swap in other providers, like local models
 
 ### Relative to Copilot / Autocomplete
 
@@ -35,7 +35,8 @@ I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this p
 
 ### Limitations
 
--   Operations work on a single file, it doesn't do any token clipping so this won't work on huge files and won't see context from other files
+-   Operations work on a single file, it doesn't do any token clipping so this won't work on huge files and won't see context from other files.
+-   The `BFEdit` and `BFHammer` commands are not very reliable, they're a hard workloaf for LMs.
 
 ## Installation / Configuration
 
@@ -93,10 +94,11 @@ butterfish.lm_fast_model = "gpt-3.5-turbo-1106"
 butterfish.lm_smart_model = "gpt-4-1106-preview"
 
 -- When running, Butterfish will record the current color and then run
--- :hi [active_color_group] ctermbg=[active_color]
+-- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
 -- This will be reset when the command is done
 butterfish.active_color_group = "User1"
-butterfish.active_color = "197"
+butterfish.active_color_cterm = "197"
+butterfish.active_color_gui = "#ff33cc"
 
 -- get path to this script
 local function get_script_path()
@@ -109,7 +111,7 @@ end
 butterfish.script_dir = get_script_path() .. "../../sh/"
 ```
 
-### Use a different or a local model
+### Use a different / local model
 
 You can use a different model if it is compatible with the OpenAI Chat Completions API. To do so, edit these configs after loading the butterfish plugin:
 
@@ -132,7 +134,7 @@ If you would like to customize these scripts, you just need to change the `butte
 1. First fully copy the script directory to your own path:
 
 ```sh
-cp -r ~/.config/nvim/plugged/butterfish.nvim/sh/ ~/butterfish_scripts
+cp -r ~/.config/nvim/plugged/butterfish.nvim/bin/ ~/butterfish_scripts
 ```
 
 2. Now set `script_dir` in your Lua config:
@@ -141,7 +143,7 @@ cp -r ~/.config/nvim/plugged/butterfish.nvim/sh/ ~/butterfish_scripts
 butterfish.script_dir = /home/me/butterfish_scripts
 ```
 
-3. Now edit the scripts, for example `~/butterfish_scripts/fileprompt.sh`.
+3. Now edit the scripts, for example `~/butterfish_scripts/fileprompt`.
 
 ## Commands
 
@@ -151,14 +153,13 @@ butterfish.script_dir = /home/me/butterfish_scripts
 -   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
 -   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
 -   **Context**: The current filetype is used (i.e. programming language), no other context is passed to the model.
--   **Script**: `prompt.sh`
 
 ### FilePrompt
 
 -   **Command**: `:BFFilePrompt <prompt>`
 -   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
 -   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
--   **Context**: The content of the current file is passed to the model.
+-   **Context**: The content of the current file is passed to the model. If you highlight code in visual mode, the model will be told to pay special attention to it.
 -   **Script**: `fileprompt.sh`
 
 ### Rewrite
@@ -209,8 +210,8 @@ butterfish.script_dir = /home/me/butterfish_scripts
 This mode is iffy, use with caution
 
 -   **Command**: `:BFEdit`
--   **Description**: Calls `butterfish edit` to make multiple edits within a file.
--   **Context**: Operates on a single file.
+-   **Description**: Calls `butterfish edit` to make multiple edits within a file. That command will pass the entire file to the model and ask the model for function calls that replace ranges of lines. This is a token-efficient way of asking for arbitrary edits, but it stretches the capabilities of even GPT-4 and isn't very reliable.
+-   **Context**: Operates on a single file, passes that entire file to model.
 -   **Script**: `edit.sh`
 
 ### Hammer
@@ -218,6 +219,6 @@ This mode is iffy, use with caution
 This mode is iffy, use with caution
 
 -   **Command**: `:BFHammer`
--   **Description**: Looks for a script called `hammer.sh`, runs that script, uses the output with `butterfish edit` to attempt to fix build and test errors, tries 5 times.
+-   **Description**: Looks for a script called `hammer.sh` in your project directory, runs that script, uses the output with `butterfish edit` to attempt to fix build and test errors, tries 5 times. This is agentic in that it loops and can try multiple approaches, consider it unreliable.
 -   **Context**: Operates on a single file.
 -   **Script**: `hammer.sh`
