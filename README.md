@@ -6,6 +6,12 @@ Neovim plugin for fluent coding using language models
 
 butterfish.nvim depends on [Butterfish](https://github.com/bakks/butterfish), using it to query OpenAI GPT-3.5/4.
 
+
+
+https://github.com/bakks/butterfish.nvim/assets/1172710/b40a33e3-5342-41f5-8104-0c9db94a2018
+
+
+
 ### Features
 
 -   Prompt for a block of code (`:BFFilePrompt`)
