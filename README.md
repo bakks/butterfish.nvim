@@ -1,10 +1,10 @@
 # 🐠 butterfish.nvim
 
-A Neovim plugin for fluently using language models
+Neovim plugin for fluent coding using language models
 
 [![Website](https://img.shields.io/badge/website-https://butterfi.sh-blue)](https://butterfi.sh) [![Latest Version](https://img.shields.io/github/v/release/bakks/butterfish.nvim)](https://github.com/bakks/butterfish.nvim/releases) [![@pbbakkum](https://img.shields.io/badge/Updates%20at-%20%40pbbakkum-blue?style=flat&logo=twitter)](https://twitter.com/pbbakkum)
 
-This is a Neovim plugin for coding with language models. It depends on [Butterfish](https://github.com/bakks/butterfish), using it to query OpenAI GPT-3.5/4.
+butterfish.nvim depends on [Butterfish](https://github.com/bakks/butterfish), using it to query OpenAI GPT-3.5/4.
 
 ### Features
 
