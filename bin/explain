@@ -25,7 +25,7 @@ parse_arguments "$@"
 
 fullprompt="$filecontents
 
-That is a code file, below is code from that file, the user wants a detailed explanation of that code.
+That is a $filetype code file, below is code from that file, the user wants a detailed explanation of that code.
 
 \"\"\"
 $fileblock
@@ -33,7 +33,7 @@ $fileblock
 
 sysmsg="You are helping an expert programmer understand code. Respond with code comments but be very detailed, explain the purpose of the code, explain how the codes works, for example if it uses a library function then explain each argument to that function. Explain the input and output or effects of the code. The user is asking for a detailed analysis of code.
 
-Do not repeat the code, only write a detail comment.
+Do not repeat the code, only write a detailed comment. The comment should be in the standard line-wise format for that language, for example python should be #, ruby should be #, golang should be //.
 
 Here is an example analysis:
 
