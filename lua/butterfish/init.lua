@@ -34,8 +34,19 @@ butterfish.script_dir = get_script_path() .. "../../bin/"
 local original_hl = ""
 local original_hl_toggle = false
 
+local highlight_exists = function(group)
+  local exists = vim.fn.hlexists(group)
+  return exists == 1
+end
+
 local set_status_bar = function()
+  -- if we've already set status bar, return
   if original_hl_toggle then
+    return
+  end
+
+  -- if the highlight group doesn't exist, return
+  if vim.fn.hlexists(butterfish.active_color_group) == 0 then
     return
   end
 
@@ -51,6 +62,11 @@ local set_status_bar = function()
 end
 
 local reset_status_bar = function()
+  -- if the highlight group doesn't exist, return
+  if vim.fn.hlexists(butterfish.active_color_group) == 0 then
+    return
+  end
+
   --reset status bar
   vim.api.nvim_set_hl(0, butterfish.active_color_group, original_hl)
   original_hl_toggle = false
