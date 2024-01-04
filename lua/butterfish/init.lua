@@ -114,7 +114,19 @@ end
 -- This will call the prompt.sh script like:
 --   prompt go main.go 42 'What is the meaning of life?'
 butterfish.command = function(
-  command, user_prompt, range_start, range_end, callback, model, basepath)
+  command,     -- name of the script to run, will look in script_dir
+  user_prompt, -- prompt to send to LLM
+  range_start, -- start of visual line range
+  range_end,   -- end of visual line range
+  callback,    -- function to call when the job is done
+  model,       -- model to use, if nil then use the default
+  basepath,    -- LM service URL, if nil then use the default
+  first_action) -- if this is the first action in a sequence, don't undojoin
+
+  if first_action == nil then
+    first_action = true
+  end
+
   local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
   local line_range = get_line_range(range_start, range_end)
@@ -140,16 +152,15 @@ butterfish.command = function(
 
   -- write the current file to disk
   vim.cmd("silent noautocmd w!")
-  first = true
 
   local job_id = vim.fn.jobstart(shell_command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
         -- undojoin to prevent undoing the command
-        if not first then
+        if not first_action then
           vim.cmd("undojoin")
         else
-          first = false
+          first_action = false
         end
         -- insert text at cursor position, don't adjust indent, move cursor to end
         vim.api.nvim_put(data, 'c', true, true)
@@ -159,10 +170,10 @@ butterfish.command = function(
     on_stderr = function(job_id, data)
       vim.schedule(function()
         -- undojoin to prevent undoing the command
-        if not first then
+        if not first_action then
           vim.cmd("undojoin")
         else
-          first = false
+          first_action = false
         end
         -- insert text at cursor position, don't adjust indent, move cursor to end
         vim.api.nvim_put(data, 'c', true, true)
@@ -241,13 +252,17 @@ local move_down_to_clear_line = function(start_range, end_range)
   local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
 
   -- If the line is not empty, create a new line below it and clear it out
+  made_change = false
   if line_text ~= nil and line_text ~= "" then
     -- Insert a new line below current line
     keys("n", "o<ESC>")
 
     -- Clear out the current line in case text like a comment was auto-inserted
     keys("n", "_d$<ESC>")
+    made_change = true
   end
+
+  return made_change
 end
 
 -- If called with a range, move up to the beginning of the range, then if that
@@ -267,13 +282,14 @@ local move_up_to_clear_line = function(start_range, end_range)
   local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
 
   -- If the line is not empty, create a new line above it and clear it out
+  made_change = false
   if line_text ~= nil and line_text ~= "" then
     -- Insert a new line above current line
     keys("n", "O<ESC>")
-
-    -- Clear out the current line in case text like a comment was auto-inserted
-    keys("n", "_d$<ESC>")
+    made_change = true
   end
+
+  return made_change
 end
 
 local comment_line_or_block = function(start_range, end_range)
@@ -296,13 +312,17 @@ local comment_current_line = function()
   end
 end
 
+local delete_current_line = function()
+  keys("n", "dd")
+end
+
 -- Enter an LLM prompt and write the response at the cursor
 -- Args:
 --   start_range    start of visual line range
 --   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
 butterfish.prompt = function(start_range, end_range, user_prompt)
-  move_down_to_clear_line(start_range, end_range)
+  made_change = move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
   butterfish.command(
@@ -311,7 +331,9 @@ butterfish.prompt = function(start_range, end_range, user_prompt)
     start_range,
     end_range,
     nil,
-    butterfish.lm_smart_model)
+    butterfish.lm_smart_model,
+    nil,
+    not made_change)
 end
 
 -- Enter an LLM prompt and write the response at the cursor, including the open
@@ -320,7 +342,7 @@ end
 --   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
 butterfish.file_prompt = function(start_range, end_range, user_prompt)
-  move_down_to_clear_line(start_range, end_range)
+  made_change = move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
   butterfish.command(
@@ -329,7 +351,9 @@ butterfish.file_prompt = function(start_range, end_range, user_prompt)
     start_range,
     end_range,
     nil,
-    butterfish.lm_smart_model)
+    butterfish.lm_smart_model,
+    nil,
+    not made_change)
 end
 
 
@@ -339,7 +363,7 @@ end
 --   end_range      end of visual line range
 --   user_prompt    prompt to send to LLM
 butterfish.rewrite = function(start_range, end_range, user_prompt)
-  move_down_to_clear_line(start_range, end_range)
+  made_change = move_down_to_clear_line(start_range, end_range)
 
   butterfish.command(
     "rewrite",
@@ -347,7 +371,9 @@ butterfish.rewrite = function(start_range, end_range, user_prompt)
     start_range,
     end_range,
     clean_up_empty_lines,
-    butterfish.lm_smart_model)
+    butterfish.lm_smart_model,
+    nil,
+    not made_change)
 
   -- The above call is async, we put this after so that we comment out the block
   -- after the file save but before any results are streamed back
@@ -356,8 +382,17 @@ end
 
 -- Add a comment above the current line or block explaining it
 butterfish.comment = function(start_range, end_range)
-  move_up_to_clear_line()
-  butterfish.command("comment", nil, start_range, end_range)
+  made_change = move_up_to_clear_line()
+
+  butterfish.command(
+    "comment",
+    nil,
+    start_range,
+    end_range,
+    delete_current_line, -- handles trailing newline
+    nil,
+    nil,
+    not made_change) -- this is not the first action in a sequence, don't undojoin
 end
 
 -- Explain a line or block of code in detail
@@ -365,8 +400,16 @@ end
 -- - If a block, remove the block
 -- - Then call explain
 butterfish.explain = function(start_range, end_range)
-  move_up_to_clear_line(start_range, end_range)
-  butterfish.command("explain", nil, start_range, end_range)
+  made_change = move_up_to_clear_line(start_range, end_range)
+  butterfish.command(
+    "explain",
+    nil,
+    start_range,
+    end_range,
+    delete_current_line, -- handles trailing newline
+    nil,
+    nil,
+    not made_change) -- this is not the first action in a sequence, don't undojoin
 end
 
 
@@ -381,7 +424,15 @@ butterfish.question = function(start_range, end_range, user_prompt)
   comment_current_line()
   move_down_to_clear_line()
 
-  butterfish.command("question", user_prompt, start_range, end_range)
+  butterfish.command(
+    "question",
+    user_prompt,
+    start_range,
+    end_range,
+    delete_current_line, -- handles trailing newline
+    nil,
+    nil,
+    false) -- this is not the first action in a sequence, don't undojoin
 end
 
 
