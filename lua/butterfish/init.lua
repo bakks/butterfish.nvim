@@ -17,7 +17,7 @@ butterfish.lm_smart_model = "gpt-4-1106-preview"
 -- When running, Butterfish will record the current color and then run
 -- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
 -- This will be reset when the command is done
-butterfish.active_color_group = "User1"
+butterfish.active_color_group = "StatusLine"
 butterfish.active_color_cterm = "197"
 butterfish.active_color_gui = "#ff33cc"
 
