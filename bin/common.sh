@@ -17,9 +17,11 @@ butterfish="butterfish"
 # This function sets the following variables:
 #   $filetype
 #   $filepath
-#   $filecontents
 #   $cursor
 #   $prompt
+#   $lm_model
+#   $lm_basepath
+#   $filecontents
 #   $fileblock
 parse_arguments() {
   filetype=$1
