@@ -68,7 +68,9 @@ local reset_status_bar = function()
   end
 
   --reset status bar
-  vim.api.nvim_set_hl(0, butterfish.active_color_group, original_hl)
+  cleaned_original_hl = {
+    ctermbg = original_hl.ctermbg, guibg = original_hl.guibg}
+  vim.api.nvim_set_hl(0, butterfish.active_color_group, cleaned_original_hl)
   original_hl_toggle = false
 end
 
