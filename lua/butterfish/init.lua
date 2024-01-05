@@ -94,14 +94,7 @@ end
 -- Call a command with the standard arguments, return the job id, call the
 -- callback when the job is done
 --
--- Args:
---  command     name of the script to run
---  user_prompt  prompt to send to LLM
---  callback    function to call when the job is done
---  model       model to use, if nil then use the default
---  basepath    LM service URL, if nil then use the default
---
--- Script: command filetype filepath line_range prompt
+-- The commands called here should accept the following arguments:
 --  filetype    filetype of the current buffer
 --  filepath    full path of the current file
 --  line_range  line number or line range
@@ -110,17 +103,17 @@ end
 --  basepath    LM service URL, if nil then use the default
 --
 -- For example, to call the prompt.sh script:
--- command("prompt", "What is the meaning of life?", function() print("done") end)
+-- command("prompt.sh", "What is the meaning of life?", 41, 42, function() print("done") end)
 -- This will call the prompt.sh script like:
---   prompt go main.go 42 'What is the meaning of life?'
+--   prompt go main.go 41-42 'What is the meaning of life?' [default model] [default basepath]
 butterfish.command = function(
-  command,     -- name of the script to run, will look in script_dir
-  user_prompt, -- prompt to send to LLM
-  range_start, -- start of visual line range
-  range_end,   -- end of visual line range
-  callback,    -- function to call when the job is done
-  model,       -- model to use, if nil then use the default
-  basepath,    -- LM service URL, if nil then use the default
+  command,      -- name of the script to run, will look in script_dir
+  user_prompt,  -- prompt to send to LLM
+  range_start,  -- start of visual line range
+  range_end,    -- end of visual line range
+  callback,     -- function to call when the job is done
+  model,        -- model to use, if nil then use the default
+  basepath,     -- LM service URL, if nil then use the default
   first_action) -- if this is the first action in a sequence, don't undojoin
 
   if first_action == nil then
