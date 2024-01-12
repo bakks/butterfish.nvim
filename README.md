@@ -1,6 +1,6 @@
 # 🐠 butterfish.nvim
 
-Neovim plugin for fluent coding using language models
+Neovim plugin for fluent coding with LLMs
 
 [![Website](https://img.shields.io/badge/website-https://butterfi.sh-blue)](https://butterfi.sh) [![@pbbakkum](https://img.shields.io/badge/Updates%20at-%20%40pbbakkum-blue?style=flat&logo=twitter)](https://twitter.com/pbbakkum)
 
