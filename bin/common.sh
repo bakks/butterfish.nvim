@@ -2,7 +2,7 @@
 
 # default model used by lm_command, applies unless a 3rd argument is provided
 default_basepath="https://api.openai.com/v1"
-default_model="gpt-3.5-turbo-1106"
+default_model="gpt-4o"
 
 # path to the butterfish binary, without an absolute path it must be in $PATH
 butterfish="butterfish"
@@ -42,7 +42,7 @@ parse_arguments() {
 # Takes 3 parameters:
 #  - $1: the LM system message
 #  - $2: the LM prompt
-#  - $3 (optional): the LM model, defaults to gpt-3.5-turbo-1106
+#  - $3 (optional): the LM model, defaults to gpt-4o
 #  - $4 (optional): the LM basepath, defaults to https://api.openai.com/v1
 lm_command() {
   model=$3 # first check model argument to this function

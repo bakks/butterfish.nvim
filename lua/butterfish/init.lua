@@ -11,8 +11,8 @@ local butterfish = {}
 -- Default LM settings, these are passed to the LLM scripts, but note that
 -- the scripts can override these settings
 butterfish.lm_base_path = "https://api.openai.com/v1"
-butterfish.lm_fast_model = "gpt-3.5-turbo-1106"
-butterfish.lm_smart_model = "gpt-4-1106-preview"
+butterfish.lm_fast_model = "gpt-3.5-turbo"
+butterfish.lm_smart_model = "gpt-4o"
 
 -- When running, Butterfish will record the current color and then run
 -- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
@@ -127,7 +127,7 @@ butterfish.command = function(
   local line_range = get_line_range(range_start, range_end)
 
   if model == nil then
-    model = butterfish.lm_fast_model
+    model = butterfish.lm_smart_model
   end
 
   if basepath == nil then
