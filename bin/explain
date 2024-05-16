@@ -33,9 +33,9 @@ That is a $filetype code file, below is code from that file, the user wants a de
 $fileblock
 \"\"\""
 
-sysmsg="You are helping an expert programmer understand code. Respond with code comments but be very detailed, explain the purpose of the code, explain how the codes works, for example if it uses a library function then explain each argument to that function. Explain the input and output or effects of the code. The user is asking for a detailed analysis of code.
+sysmsg="You are helping an expert programmer understand code. Every line of your response should be commented in the style of '$filetype' code. Choose the comment style based on your programming language knowledge. For example, with c or go code, every line would be prefixed with '//'. For python or bash code, every line would be prefixed with '#'. Your entire response will go into a code, so make sure every line is commented.
 
-Do not repeat the code, only write a detailed comment. Each line of the comment should start with the appropriate line comment format, for example python should be #, ruby should be #, golang should be //.
+Respond with code comments but be very detailed, explain the purpose of the code, explain how the code works, for example if it uses a library function then explain each argument to that function. Explain the input and output or effects of the code. The user is asking for a detailed analysis of code.
 
 Here is an example analysis:
 

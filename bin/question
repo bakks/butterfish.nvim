@@ -44,10 +44,10 @@ fullprompt="$fullprompt
 
 Here is my question: $prompt"
 
-sysmsg="You are helping an expert programmer understand code. Every line of your response should be commented for $filetype code. For example, with c code, every line would be prefixed with '//'.
+sysmsg="You are helping an expert programmer understand code. Every line of your response should be commented in the style of '$filetype' code. Choose the comment style based on your programming language knowledge. For example, with c or go code, every line would be prefixed with '//'. For python or bash code, every line would be prefixed with '#'. Your entire response will go into a code, so make sure every line is commented.
 
 For example
-Here is my question: What is the return type?
+Here is my question: What is the return type of this c function?
 
 // Answer: The return type is int"
 
