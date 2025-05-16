@@ -2,7 +2,7 @@
 
 # default model used by lm_command, applies unless a 3rd argument is provided
 default_basepath="https://api.openai.com/v1"
-default_model="gpt-4o"
+default_model="gpt-4.1"
 
 # path to the butterfish binary, without an absolute path it must be in $PATH
 butterfish="butterfish"
