@@ -36,7 +36,9 @@ local active_jobs = {}
 local cancelled_jobs = {}
 local active_job_count = 0
 local job_buffers = {}
+local job_states = {}
 local locked_buffers = {}
+local stream_ns = vim.api.nvim_create_namespace("butterfish_stream")
 
 local highlight_exists = function(group)
   local exists = vim.fn.hlexists(group)
@@ -131,7 +133,76 @@ local with_temporary_modifiable = function(bufnr, fn)
   end
 end
 
-local track_job_started = function(job_id, bufnr)
+local create_stream_state = function(bufnr)
+  if bufnr == nil or not vim.api.nvim_buf_is_valid(bufnr) then
+    return nil
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local mark_id = vim.api.nvim_buf_set_extmark(
+    bufnr,
+    stream_ns,
+    cursor[1] - 1,
+    cursor[2],
+    { right_gravity = true })
+
+  return {
+    bufnr = bufnr,
+    mark_id = mark_id,
+  }
+end
+
+local dispose_stream_state = function(state)
+  if state == nil or state.bufnr == nil or state.mark_id == nil then
+    return
+  end
+  if not vim.api.nvim_buf_is_valid(state.bufnr) then
+    return
+  end
+  pcall(vim.api.nvim_buf_del_extmark, state.bufnr, stream_ns, state.mark_id)
+end
+
+local get_stream_position = function(state)
+  if state == nil or state.bufnr == nil or state.mark_id == nil then
+    return nil, nil
+  end
+  if not vim.api.nvim_buf_is_valid(state.bufnr) then
+    return nil, nil
+  end
+
+  local pos = vim.api.nvim_buf_get_extmark_by_id(state.bufnr, stream_ns, state.mark_id, {})
+  if pos == nil or #pos < 2 then
+    return nil, nil
+  end
+
+  return pos[1], pos[2]
+end
+
+local append_stream_data = function(state, data)
+  if state == nil or data == nil or #data == 0 then
+    return
+  end
+
+  local row, col = get_stream_position(state)
+  if row == nil or col == nil then
+    return
+  end
+
+  vim.api.nvim_buf_set_text(state.bufnr, row, col, row, col, data)
+end
+
+local get_cleanup_target = function(state)
+  if state ~= nil then
+    local row, _ = get_stream_position(state)
+    if row ~= nil then
+      return state.bufnr, row + 1
+    end
+  end
+
+  return 0, vim.api.nvim_win_get_cursor(0)[1]
+end
+
+local track_job_started = function(job_id, bufnr, state)
   if job_id == nil or job_id <= 0 then
     return false
   end
@@ -140,13 +211,17 @@ local track_job_started = function(job_id, bufnr)
     active_job_count = active_job_count + 1
   end
   job_buffers[job_id] = bufnr
+  job_states[job_id] = state
   lock_buffer(bufnr)
   return true
 end
 
 local track_job_finished = function(job_id)
   local bufnr = job_buffers[job_id]
+  local state = job_states[job_id]
   job_buffers[job_id] = nil
+  job_states[job_id] = nil
+  dispose_stream_state(state)
   unlock_buffer(bufnr)
 
   if active_jobs[job_id] then
@@ -243,6 +318,7 @@ butterfish.command = function(
 
   -- write the current file to disk
   vim.cmd("silent noautocmd w!")
+  local state = create_stream_state(bufnr)
 
   local stream_chunk_is_empty = function(data)
     if data == nil or #data == 0 then
@@ -276,8 +352,7 @@ butterfish.command = function(
               -- undojoin can fail if vim undo state changed; keep streaming anyway
               pcall(vim.cmd, "undojoin")
             end
-            -- insert text at cursor position, don't adjust indent, move cursor to end
-            vim.api.nvim_put(data, 'c', true, true)
+            append_stream_data(job_states[job_id], data)
             first_action = false
           end)
         end)
@@ -303,8 +378,7 @@ butterfish.command = function(
               -- undojoin can fail if vim undo state changed; keep streaming anyway
               pcall(vim.cmd, "undojoin")
             end
-            -- insert text at cursor position, don't adjust indent, move cursor to end
-            vim.api.nvim_put(data, 'c', true, true)
+            append_stream_data(job_states[job_id], data)
             first_action = false
           end)
         end)
@@ -317,14 +391,17 @@ butterfish.command = function(
 
         -- call callback now that the child process is done, unless cancelled
         if callback and not was_cancelled and exit_code == 0 then
-          with_temporary_modifiable(bufnr, callback)
+          with_temporary_modifiable(bufnr, function()
+            callback(job_states[job_id])
+          end)
         end
         track_job_finished(job_id)
       end)
     end,
   })
 
-  if not track_job_started(job_id, bufnr) then
+  if not track_job_started(job_id, bufnr, state) then
+    dispose_stream_state(state)
     reset_status_bar()
   end
 
@@ -345,18 +422,17 @@ end
 -- - Get the current line
 -- - If the line is empty, delete it
 -- - If the line is not empty, break
-local clean_up_empty_lines = function()
-  -- Get the current line number
-  local line_number = vim.api.nvim_win_get_cursor(0)[1]
+local clean_up_empty_lines = function(state)
+  local bufnr, line_number = get_cleanup_target(state)
 
   -- Start a loop that will continue until it hits a non-empty line
   while true do
     -- Get the text of the current line
-    local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
+    local line_text = vim.api.nvim_buf_get_lines(bufnr, line_number - 1, line_number, false)[1]
 
     -- If the line is empty or only contains whitespace, delete it
     if line_text == nil or line_text:match("^%s*$") then
-      vim.api.nvim_buf_set_lines(0, line_number - 1, line_number, false, {})
+      vim.api.nvim_buf_set_lines(bufnr, line_number - 1, line_number, false, {})
     else
       -- If the line is not empty, break the loop
       break
@@ -450,11 +526,11 @@ end
 
 -- Remove the current line only if it is empty/whitespace.
 -- Used after streaming commands that might or might not leave a trailing newline.
-local delete_current_line_if_empty = function()
-  local line_number = vim.api.nvim_win_get_cursor(0)[1]
-  local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
+local delete_current_line_if_empty = function(state)
+  local bufnr, line_number = get_cleanup_target(state)
+  local line_text = vim.api.nvim_buf_get_lines(bufnr, line_number - 1, line_number, false)[1]
   if line_text == nil or line_text:match("^%s*$") then
-    vim.api.nvim_buf_set_lines(0, line_number - 1, line_number, false, {})
+    vim.api.nvim_buf_set_lines(bufnr, line_number - 1, line_number, false, {})
   end
 end
 
