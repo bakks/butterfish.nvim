@@ -757,7 +757,8 @@ butterfish.edit = function(start_range, end_range, prompt)
 end
 
 -- Cancel all active Butterfish jobs.
-butterfish.cancel = function()
+-- If silent is true, suppress "no active job" / "cancelled N jobs" messages.
+butterfish.cancel = function(silent)
   local cancelled_count = 0
   for job_id, _ in pairs(active_jobs) do
     cancelled_jobs[job_id] = true
@@ -765,11 +766,15 @@ butterfish.cancel = function()
     cancelled_count = cancelled_count + 1
   end
 
-  if cancelled_count == 0 then
-    print("No active Butterfish job")
-  else
-    print("Cancelled " .. cancelled_count .. " Butterfish job(s)")
+  if not silent then
+    if cancelled_count == 0 then
+      print("No active Butterfish job")
+    else
+      print("Cancelled " .. cancelled_count .. " Butterfish job(s)")
+    end
   end
+
+  return cancelled_count
 end
 
 -- Commands for each function
