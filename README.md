@@ -4,7 +4,7 @@ Neovim plugin for fluent coding with LLMs
 
 [![Website](https://img.shields.io/badge/website-https://butterfi.sh-blue)](https://butterfi.sh) [![@pbbakkum](https://img.shields.io/badge/Updates%20at-%20%40pbbakkum-blue?style=flat&logo=twitter)](https://twitter.com/pbbakkum)
 
-butterfish.nvim depends on [Butterfish](https://github.com/bakks/butterfish), using it to query OpenAI GPT-3.5/4.
+butterfish.nvim depends on [Butterfish](https://github.com/bakks/butterfish), using it to query OpenAI models via the Responses API.
 
 https://github.com/bakks/butterfish.nvim/assets/1172710/b40a33e3-5342-41f5-8104-0c9db94a2018
 
@@ -18,7 +18,7 @@ https://github.com/bakks/butterfish.nvim/assets/1172710/b40a33e3-5342-41f5-8104-
 -   Implement a block based on preceding code (`:BFImplement`)
 -   General question/answer (`:BFQuestion`)
 -   Edit a file in multiple places given a prompt (`:BFEdit`)
--   Loop on a build script and attempt to resolve problems (`:BFHammer`)
+-   Cancel an in-progress request (`:BFCancel`)
 
 ### Key design points
 
@@ -26,19 +26,20 @@ https://github.com/bakks/butterfish.nvim/assets/1172710/b40a33e3-5342-41f5-8104-
 -   Focus on writing code in a specific place rather than "chat with your codebase", no indexing / vectorization
 -   Uses OpenAI models through the [Butterfish](https://butterfi.sh) CLI
 -   LLM calls go through shell scripts so you can edit prompts and swap in other providers, like local models
+-   While a request is running, the active buffer is temporarily read-only to avoid accidental conflicting edits
 
 ### Relative to Copilot / Autocomplete
 
 I'm a big user of [Github Copilot](https://github.com/tpope/copilot.vim), this plugin is meant as a complement. Copilot is great for immediate suggestions, the intention here is:
 
 -   Allow more specific instructions and different modalities, e.g. "rewrite this code to ..."
--   Use GPT-4 for more sophisticated coding responses
+-   Use GPT-5.2 for more sophisticated coding responses
 -   Enable fluent shortcuts for actions like "add a comment above this line", or "fix the LSP error on this line"
 
 ### Limitations
 
 -   Operations work on a single file, it doesn't do any token clipping so this won't work on huge files and won't see context from other files.
--   The `BFEdit` and `BFHammer` commands are not very reliable, they're a hard workloaf for LMs.
+-   The `BFEdit` command is not always reliable for large or ambiguous edit requests.
 
 ## Installation / Configuration
 
@@ -76,7 +77,8 @@ vim.keymap.set('v', ',e', ':BFExplain<CR>',   opts)
 vim.keymap.set('n', ',f', ':BFFix<CR>',       opts)
 vim.keymap.set('n', ',i', ':BFImplement<CR>', opts)
 vim.keymap.set('n', ',d', ':BFEdit ',         opts)
-vim.keymap.set('n', ',h', ':BFHammer<CR>',    opts)
+vim.keymap.set('v', ',d', ':BFEdit ',         opts)
+vim.keymap.set('n', ',x', ':BFCancel<CR>',    opts)
 vim.keymap.set('n', ',q', ':BFQuestion ',     opts)
 vim.keymap.set('v', ',q', ':BFQuestion ',     opts)
 ```
@@ -91,13 +93,12 @@ These are configurable values with their default settings below. You do not need
 -- Default LM settings, these are passed to the LLM scripts, but note that
 -- the scripts can override these settings
 butterfish.lm_base_path = "https://api.openai.com/v1"
-butterfish.lm_fast_model = "gpt-3.5-turbo"
-butterfish.lm_smart_model = "gpt-4o"
+butterfish.lm_smart_model = "gpt-5.2"
 
 -- When running, Butterfish will record the current color and then run
 -- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
 -- This will be reset when the command is done
-butterfish.active_color_group = "User1"
+butterfish.active_color_group = "StatusLine"
 butterfish.active_color_cterm = "197"
 butterfish.active_color_gui = "#ff33cc"
 
@@ -109,24 +110,23 @@ end
 
 -- Where to look for bash scripts that are used to call the LLM
 -- This can be customized to use your own scripts
-butterfish.script_dir = get_script_path() .. "../../sh/"
+butterfish.script_dir = get_script_path() .. "../../bin/"
 ```
 
 ### Use a different / local model
 
-You can use a different model if it is compatible with the OpenAI Chat Completions API. To do so, edit these configs after loading the butterfish plugin:
+You can use a different model if it is compatible with the OpenAI Responses API. To do so, edit these configs after loading the butterfish plugin:
 
 ```lua
 butterfish.lm_base_path = "http://localhost/model-path"
-butterfish.lm_fast_model = "my-model-1"
-butterfish.lm_smart_model = "my-model-2"
+butterfish.lm_smart_model = "my-model"
 ```
 
 ### Customize prompts
 
 You can also customize the plugin language model prompts and use a different client than the Butterfish CLI. Every Butterfish command points to a bash script, which sets up the prompts and then calls the language model client. For example:
 
--   If you run ":BFFilePrompt <prompt>" in Neovim, the plugin will call `fileprompt.sh`
+-   If you run ":BFFilePrompt <prompt>" in Neovim, the plugin will call `fileprompt`
 -   That script configures a system message, e.g. 'Youre helping write code'
 -   That script will call `butterfish prompt`, which streams the response to the prompt from the language model.
 
@@ -141,7 +141,7 @@ cp -r ~/.config/nvim/plugged/butterfish.nvim/bin/ ~/butterfish_scripts
 2. Now set `script_dir` in your Lua config:
 
 ```lua
-butterfish.script_dir = /home/me/butterfish_scripts
+butterfish.script_dir = "/home/me/butterfish_scripts"
 ```
 
 3. Now edit the scripts, for example `~/butterfish_scripts/fileprompt`.
@@ -161,7 +161,7 @@ butterfish.script_dir = /home/me/butterfish_scripts
 -   **Arguments**: Simple LLM prompt, e.g. 'a function that calculates the fibonacci sequence'
 -   **Description**: Write a prompt describing code you want, a new line will be created and code will be generated.
 -   **Context**: The content of the current file is passed to the model. If you highlight code in visual mode, the model will be told to pay special attention to it.
--   **Script**: `fileprompt.sh`
+-   **Script**: `fileprompt`
 
 ### Rewrite
 
@@ -169,57 +169,53 @@ butterfish.script_dir = /home/me/butterfish_scripts
 -   **Arguments**: A prompt describing how to rewrite the selected code
 -   **Description**: Comments out the currently selected code and rewrites it based on a prompt.
 -   **Context**: Operates on a block of lines. The command passes the range of selected lines and user prompt to the ai model along with the full file.
--   **Script**: `rewrite.sh`
+-   **Script**: `rewrite`
 
 ### Comment
 
 -   **Command**: `:BFComment`
 -   **Description**: Adds a comment above the current line or block explaining it.
 -   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
--   **Script**: `comment.sh`
+-   **Script**: `comment`
 
 ### Explain
 
 -   **Command**: `:BFExplain`
 -   **Description**: Explains a line or block of code in detail, for example, adds a comment above each line in a block of code.
 -   **Context**: Operates on a single or block of lines. The command passes the full code file to the model.
--   **Script**: `explain.sh`
+-   **Script**: `explain`
 
 ### Fix
 
 -   **Command**: `:BFFix`
 -   **Description**: Attempts to fix an LSP error on the current line. Will comment out the current line and generate a new one.
 -   **Context**: Operates on a single line, but passes the preceding and succeeding 5 lines to the model to help provide context.
--   **Script**: `fix.sh`
+-   **Script**: `fix`
 
 ### Implement
 
 -   **Command**: `:BFImplement`
 -   **Description**: Like superpowered autocomplete, this attempts to complete whatever code you're writing, for example works well if you start it on a line with a function signature.
 -   **Context**: The command fetches the previous 150 lines and sends them to the ai model.
--   **Script**: `implement.sh`
+-   **Script**: `implement`
 
 ### Question
 
 -   **Command**: `:BFQuestion`
 -   **Description**: Ask a question about code within the buffer.
 -   **Context**: Operates on a single line or a block of code.
--   **Script**: `question.sh`
+-   **Script**: `question`
 
 ### Edit
 
 This mode is iffy, use with caution
 
 -   **Command**: `:BFEdit`
--   **Description**: Calls `butterfish edit` to make multiple edits within a file. That command will pass the entire file to the model and ask the model for function calls that replace ranges of lines. This is a token-efficient way of asking for arbitrary edits, but it stretches the capabilities of even GPT-4 and isn't very reliable.
--   **Context**: Operates on a single file, passes that entire file to model.
--   **Script**: `edit.sh`
+-   **Description**: Rewrites the selected line/block using `butterfish prompt`, while passing the full file as context.
+-   **Context**: Operates on a selected line/block, with full-file context sent to the model.
+-   **Script**: `edit`
 
-### Hammer
+### Cancel
 
-This mode is iffy, use with caution
-
--   **Command**: `:BFHammer`
--   **Description**: Looks for a script called `hammer.sh` in your project directory, runs that script, uses the output with `butterfish edit` to attempt to fix build and test errors, tries 5 times. This is agentic in that it loops and can try multiple approaches, consider it unreliable.
--   **Context**: Operates on a single file.
--   **Script**: `hammer.sh`
+-   **Command**: `:BFCancel`
+-   **Description**: Cancels any active Butterfish job (streaming or edit).

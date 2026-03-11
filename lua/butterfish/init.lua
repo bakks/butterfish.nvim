@@ -11,8 +11,7 @@ local butterfish = {}
 -- Default LM settings, these are passed to the LLM scripts, but note that
 -- the scripts can override these settings
 butterfish.lm_base_path = "https://api.openai.com/v1"
-butterfish.lm_fast_model = "gpt-3.5-turbo"
-butterfish.lm_smart_model = "gpt-4o"
+butterfish.lm_smart_model = "gpt-5.2"
 
 -- When running, Butterfish will record the current color and then run
 -- :hi [active_color_group] ctermbg=[active_color_cterm] guibg=[active_color_gui]
@@ -33,6 +32,11 @@ butterfish.script_dir = get_script_path() .. "../../bin/"
 
 local original_hl = ""
 local original_hl_toggle = false
+local active_jobs = {}
+local cancelled_jobs = {}
+local active_job_count = 0
+local job_buffers = {}
+local locked_buffers = {}
 
 local highlight_exists = function(group)
   local exists = vim.fn.hlexists(group)
@@ -68,10 +72,92 @@ local reset_status_bar = function()
   end
 
   --reset status bar
-  cleaned_original_hl = {
+  local cleaned_original_hl = {
     ctermbg = original_hl.ctermbg, guibg = original_hl.guibg}
   vim.api.nvim_set_hl(0, butterfish.active_color_group, cleaned_original_hl)
   original_hl_toggle = false
+end
+
+local lock_buffer = function(bufnr)
+  if bufnr == nil or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  local state = locked_buffers[bufnr]
+  if state == nil then
+    state = {
+      count = 0,
+      modifiable = vim.bo[bufnr].modifiable,
+    }
+    locked_buffers[bufnr] = state
+    vim.bo[bufnr].modifiable = false
+  end
+  state.count = state.count + 1
+end
+
+local unlock_buffer = function(bufnr)
+  if bufnr == nil then
+    return
+  end
+
+  local state = locked_buffers[bufnr]
+  if state == nil then
+    return
+  end
+
+  state.count = state.count - 1
+  if state.count <= 0 then
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      vim.bo[bufnr].modifiable = state.modifiable
+    end
+    locked_buffers[bufnr] = nil
+  end
+end
+
+local with_temporary_modifiable = function(bufnr, fn)
+  local state = locked_buffers[bufnr]
+  if state ~= nil and vim.api.nvim_buf_is_valid(bufnr) then
+    vim.bo[bufnr].modifiable = true
+  end
+
+  local ok, err = pcall(fn)
+
+  if state ~= nil and vim.api.nvim_buf_is_valid(bufnr) then
+    vim.bo[bufnr].modifiable = false
+  end
+
+  if not ok then
+    vim.api.nvim_err_writeln("Butterfish write failed: " .. tostring(err))
+  end
+end
+
+local track_job_started = function(job_id, bufnr)
+  if job_id == nil or job_id <= 0 then
+    return false
+  end
+  if not active_jobs[job_id] then
+    active_jobs[job_id] = true
+    active_job_count = active_job_count + 1
+  end
+  job_buffers[job_id] = bufnr
+  lock_buffer(bufnr)
+  return true
+end
+
+local track_job_finished = function(job_id)
+  local bufnr = job_buffers[job_id]
+  job_buffers[job_id] = nil
+  unlock_buffer(bufnr)
+
+  if active_jobs[job_id] then
+    active_jobs[job_id] = nil
+    active_job_count = active_job_count - 1
+  end
+  cancelled_jobs[job_id] = nil
+  if active_job_count <= 0 then
+    active_job_count = 0
+    reset_status_bar()
+  end
 end
 
 -- Function to get line range based on mode
@@ -81,6 +167,15 @@ local function get_line_range(range_start, range_end)
   end
 
   return range_start .. "-" .. range_end
+end
+
+local ensure_buffer_available = function()
+  local bufnr = vim.api.nvim_get_current_buf()
+  if locked_buffers[bufnr] ~= nil then
+    vim.api.nvim_err_writeln("Butterfish request already running for this buffer. Use :BFCancel to stop it.")
+    return false
+  end
+  return true
 end
 
 
@@ -124,6 +219,7 @@ butterfish.command = function(
 
   local filetype = vim.bo.filetype
   local filepath = vim.fn.expand("%:p")
+  local bufnr = vim.api.nvim_get_current_buf()
   local line_range = get_line_range(range_start, range_end)
 
   if model == nil then
@@ -148,43 +244,89 @@ butterfish.command = function(
   -- write the current file to disk
   vim.cmd("silent noautocmd w!")
 
+  local stream_chunk_is_empty = function(data)
+    if data == nil or #data == 0 then
+      return true
+    end
+    for _, line in ipairs(data) do
+      if line ~= "" then
+        return false
+      end
+    end
+    return true
+  end
+
   local job_id = vim.fn.jobstart(shell_command, {
     on_stdout = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to prevent undoing the command
-        if not first_action then
-          vim.cmd("undojoin")
-        else
-          first_action = false
+        if cancelled_jobs[job_id] then
+          return
         end
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(data, 'c', true, true)
+        if stream_chunk_is_empty(data) then
+          return
+        end
+
+        -- undojoin to prevent undoing the command
+        with_temporary_modifiable(bufnr, function()
+          if not vim.api.nvim_buf_is_valid(bufnr) then
+            return
+          end
+          vim.api.nvim_buf_call(bufnr, function()
+            if not first_action then
+              -- undojoin can fail if vim undo state changed; keep streaming anyway
+              pcall(vim.cmd, "undojoin")
+            end
+            -- insert text at cursor position, don't adjust indent, move cursor to end
+            vim.api.nvim_put(data, 'c', true, true)
+            first_action = false
+          end)
+        end)
       end)
     end,
 
     on_stderr = function(job_id, data)
       vim.schedule(function()
-        -- undojoin to prevent undoing the command
-        if not first_action then
-          vim.cmd("undojoin")
-        else
-          first_action = false
+        if cancelled_jobs[job_id] then
+          return
         end
-        -- insert text at cursor position, don't adjust indent, move cursor to end
-        vim.api.nvim_put(data, 'c', true, true)
+        if stream_chunk_is_empty(data) then
+          return
+        end
+
+        with_temporary_modifiable(bufnr, function()
+          if not vim.api.nvim_buf_is_valid(bufnr) then
+            return
+          end
+          vim.api.nvim_buf_call(bufnr, function()
+            -- undojoin to prevent undoing the command
+            if not first_action then
+              -- undojoin can fail if vim undo state changed; keep streaming anyway
+              pcall(vim.cmd, "undojoin")
+            end
+            -- insert text at cursor position, don't adjust indent, move cursor to end
+            vim.api.nvim_put(data, 'c', true, true)
+            first_action = false
+          end)
+        end)
       end)
     end,
 
     on_exit = function(job_id, exit_code, event_type)
       vim.schedule(function()
-        -- call callback now that the child process is done
-        if callback then
-          callback()
+        local was_cancelled = cancelled_jobs[job_id] == true
+
+        -- call callback now that the child process is done, unless cancelled
+        if callback and not was_cancelled and exit_code == 0 then
+          with_temporary_modifiable(bufnr, callback)
         end
-        reset_status_bar()
+        track_job_finished(job_id)
       end)
     end,
   })
+
+  if not track_job_started(job_id, bufnr) then
+    reset_status_bar()
+  end
 
   return job_id
 end
@@ -247,13 +389,11 @@ local move_down_to_clear_line = function(start_range, end_range)
   local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
 
   -- If the line is not empty, create a new line below it and clear it out
-  made_change = false
+  local made_change = false
   if line_text ~= nil and line_text ~= "" then
-    -- Insert a new line below current line
-    keys("n", "o<ESC>")
-
-    -- Clear out the current line in case text like a comment was auto-inserted
-    keys("n", "_d$<ESC>")
+    -- Insert a blank line below current line and place cursor there.
+    vim.api.nvim_buf_set_lines(0, line_number, line_number, false, {""})
+    vim.api.nvim_win_set_cursor(0, {line_number + 1, 0})
     made_change = true
   end
 
@@ -277,10 +417,11 @@ local move_up_to_clear_line = function(start_range, end_range)
   local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
 
   -- If the line is not empty, create a new line above it and clear it out
-  made_change = false
+  local made_change = false
   if line_text ~= nil and line_text ~= "" then
-    -- Insert a new line above current line
-    keys("n", "O<ESC>")
+    -- Insert a blank line above current line and place cursor there.
+    vim.api.nvim_buf_set_lines(0, line_number - 1, line_number - 1, false, {""})
+    vim.api.nvim_win_set_cursor(0, {line_number, 0})
     made_change = true
   end
 
@@ -307,8 +448,14 @@ local comment_current_line = function()
   end
 end
 
-local delete_current_line = function()
-  keys("n", "dd")
+-- Remove the current line only if it is empty/whitespace.
+-- Used after streaming commands that might or might not leave a trailing newline.
+local delete_current_line_if_empty = function()
+  local line_number = vim.api.nvim_win_get_cursor(0)[1]
+  local line_text = vim.api.nvim_buf_get_lines(0, line_number - 1, line_number, false)[1]
+  if line_text == nil or line_text:match("^%s*$") then
+    vim.api.nvim_buf_set_lines(0, line_number - 1, line_number, false, {})
+  end
 end
 
 -- Enter an LLM prompt and write the response at the cursor
@@ -317,7 +464,10 @@ end
 --   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
 butterfish.prompt = function(start_range, end_range, user_prompt)
-  made_change = move_down_to_clear_line(start_range, end_range)
+  if not ensure_buffer_available() then
+    return
+  end
+  local made_change = move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
   butterfish.command(
@@ -337,7 +487,10 @@ end
 --   end_range      end of visual line range
 --   user_prompt    prompt added by user from command, will be sent to LM
 butterfish.file_prompt = function(start_range, end_range, user_prompt)
-  made_change = move_down_to_clear_line(start_range, end_range)
+  if not ensure_buffer_available() then
+    return
+  end
+  local made_change = move_down_to_clear_line(start_range, end_range)
 
   -- Execute the command
   butterfish.command(
@@ -358,7 +511,10 @@ end
 --   end_range      end of visual line range
 --   user_prompt    prompt to send to LLM
 butterfish.rewrite = function(start_range, end_range, user_prompt)
-  made_change = move_down_to_clear_line(start_range, end_range)
+  if not ensure_buffer_available() then
+    return
+  end
+  local made_change = move_down_to_clear_line(start_range, end_range)
 
   butterfish.command(
     "rewrite",
@@ -372,19 +528,24 @@ butterfish.rewrite = function(start_range, end_range, user_prompt)
 
   -- The above call is async, we put this after so that we comment out the block
   -- after the file save but before any results are streamed back
-  comment_line_or_block(start_range, end_range)
+  with_temporary_modifiable(vim.api.nvim_get_current_buf(), function()
+    comment_line_or_block(start_range, end_range)
+  end)
 end
 
 -- Add a comment above the current line or block explaining it
 butterfish.comment = function(start_range, end_range)
-  made_change = move_up_to_clear_line()
+  if not ensure_buffer_available() then
+    return
+  end
+  local made_change = move_up_to_clear_line(start_range, end_range)
 
   butterfish.command(
     "comment",
     nil,
     start_range,
     end_range,
-    delete_current_line, -- handles trailing newline
+    delete_current_line_if_empty, -- trim trailing blank line if present
     nil,
     nil,
     not made_change) -- this is not the first action in a sequence, don't undojoin
@@ -395,13 +556,16 @@ end
 -- - If a block, remove the block
 -- - Then call explain
 butterfish.explain = function(start_range, end_range)
-  made_change = move_up_to_clear_line(start_range, end_range)
+  if not ensure_buffer_available() then
+    return
+  end
+  local made_change = move_up_to_clear_line(start_range, end_range)
   butterfish.command(
     "explain",
     nil,
     start_range,
     end_range,
-    delete_current_line, -- handles trailing newline
+    delete_current_line_if_empty, -- trim trailing blank line if present
     nil,
     nil,
     not made_change) -- this is not the first action in a sequence, don't undojoin
@@ -412,6 +576,9 @@ end
 -- This will move above the line or block and create a new line
 -- It will add "Question: <prompt>" to the new line and comment it out
 butterfish.question = function(start_range, end_range, user_prompt)
+  if not ensure_buffer_available() then
+    return
+  end
   move_up_to_clear_line(start_range, end_range)
 
   -- Add Question: <prompt> to the new line and comment it out
@@ -424,7 +591,7 @@ butterfish.question = function(start_range, end_range, user_prompt)
     user_prompt,
     start_range,
     end_range,
-    delete_current_line, -- handles trailing newline
+    delete_current_line_if_empty, -- trim trailing blank line if present
     nil,
     nil,
     false) -- this is not the first action in a sequence, don't undojoin
@@ -439,11 +606,14 @@ end
 -- - Sends the error message to LLM
 -- - Inserts the response at the cursor
 butterfish.fix = function()
+  if not ensure_buffer_available() then
+    return
+  end
   -- Get the current line number
   local line_number = vim.api.nvim_win_get_cursor(0)[1]
 
   -- Safely retrieve the error message from line diagnostics
-  local line_diagnostics = vim.lsp.diagnostic.get_line_diagnostics()
+  local line_diagnostics = vim.diagnostic.get(0, { lnum = line_number - 1 })
   local error_message = (line_diagnostics and line_diagnostics[1] and line_diagnostics[1].message) or nil
 
   -- If there is no error message, return
@@ -459,7 +629,9 @@ butterfish.fix = function()
   move_down_to_clear_line()
 
   butterfish.command("fix", error_message, context_start, context_end, nil, butterfish.lm_smart_model)
-  comment_line_or_block(line_number, line_number)
+  with_temporary_modifiable(vim.api.nvim_get_current_buf(), function()
+    comment_line_or_block(line_number, line_number)
+  end)
 end
 
 -- Implement the next block of code based on the previous lines
@@ -467,252 +639,25 @@ end
 -- - Get the previous 150 lines
 -- - Call implement
 butterfish.implement = function()
+  if not ensure_buffer_available() then
+    return
+  end
   move_down_to_clear_line()
-  butterfish.command("implement", nil, context_end)
+  butterfish.command("implement", nil, nil, nil)
 end
 
--- Locate a hammer script and return the absolute path
--- Start in the current directory and move up until we find a hammer script
-local find_hammer_script = function()
-  local hammer_script = "hammer"
-  local current_dir = vim.fn.expand("%:p:h")
-  local hammer_script_path = current_dir .. "/" .. hammer_script
-
-  while true do
-    if vim.fn.filereadable(hammer_script_path) == 1 then
-      return hammer_script_path
-    end
-
-    if current_dir == "/" then
-      return nil
-    end
-
-    current_dir = vim.fn.fnamemodify(current_dir, ":h")
-    hammer_script_path = current_dir .. "/" .. hammer_script
+local trim_trailing_empty_lines = function(lines)
+  while #lines > 0 and lines[#lines] == "" do
+    table.remove(lines, #lines)
   end
+  return lines
 end
-
-
--- SplitContext is a helper class for managing a split window and buffer
--- It is used by the hammer mode to display the output of the hammer script
--- It opens a split with a new window and buffer at the bottom, then allows
--- appending text to the buffer.
-local SplitContext = {}
-SplitContext.__index = SplitContext
-
--- Constructor for SplitContext
-function SplitContext.new()
-  local self = setmetatable({}, SplitContext)
-  self.buffer = nil
-  self.window = nil
-  self.original_window = nil
-  return self
-end
-
--- Create a new split window, create a buffer
-function SplitContext:create_split()
-  if self.buffer == nil then
-    -- Create a new buffer and get its buffer number
-    self.buffer = vim.api.nvim_create_buf(false, true)
-  else
-    -- Clear the buffer
-    vim.api.nvim_buf_set_lines(self.buffer, 0, -1, false, {})
-  end
-
-  self.original_window = vim.api.nvim_get_current_win()
-
-  if self.window == nil or not vim.api.nvim_win_is_valid(self.window) then
-    -- Split the window horizontally with new split on the bottom
-    vim.cmd("split")
-    vim.cmd("wincmd J")
-
-    -- Get the current window
-    self.window = vim.api.nvim_get_current_win()
-
-    -- Set the current window's buffer to the new buffer
-    vim.api.nvim_win_set_buf(self.window, self.buffer)
-  end
-end
-
--- Append text to the buffer
-function SplitContext:append(text)
-  if self.buffer == nil then
-    return
-  end
-
-  local to_add = text
-
-  if type(text) == "string" then
-    to_add = {text}
-  end
-
-  -- Switch to hammer window
-  vim.api.nvim_set_current_win(self.window)
-
-  vim.api.nvim_put(to_add, 'c', true, true)
-end
-
--- Append text as a new line in the buffer
-function SplitContext:append_line(text)
-  self:append({text, ""})
-end
-
--- Switch to the hammer window
-function SplitContext:switch_to_window()
-  vim.api.nvim_set_current_win(self.window)
-end
-
--- SplitContext method to switch back to the original window
-function SplitContext:switch_to_original_window()
-  vim.api.nvim_set_current_win(self.original_window)
-end
-
-
-local hammer_ttl = 0
-local hammer_split_context = nil
-local hammer_step1 = nil
-
--- Hammer step two checks the output of the project hammer.sh script and
--- if it has a nonzero exit then it runs the plugin hammer script to
--- invoke the LM
-local hammer_step2 = function(status)
-  if status == 0 then
-    reset_status_bar()
-    hammer_split_context:append("Hammer succeeded")
-    return
-  end
-
-  hammer_split_context:switch_to_original_window()
-
-  -- write file to disk (the original buffer, not the hammer buffer)
-  vim.cmd("silent noautocmd w!")
-
-  -- Now we run the plugin hammer script which asks the LM for a fix plan
-  -- based on the failure in the hammer.sh log
-  local filepath = vim.fn.expand("%:p")
-  local filetype = vim.bo.filetype
-
-  hammer_split_context:switch_to_window()
-
-  local command = butterfish.script_dir .. "hammer " ..
-    filetype .. " " ..
-    filepath .. " " ..
-    "1" .. -- dummy line range
-    " '" .. escape_code(hammerlog) .. "'" ..
-    " '" .. butterfish.lm_smart_model .. "'" ..
-    " '" .. butterfish.lm_base_path .. "'"
-
-  local found_function = false
-
-  local job_id = vim.fn.jobstart(command, {
-    on_stdout = function(job_id, data)
-      vim.schedule(function()
-        hammer_split_context:append(data)
-      end)
-    end,
-
-    on_stderr = function(job_id, data)
-      vim.schedule(function()
-        hammer_split_context:append(data)
-      end)
-    end,
-
-    on_exit = function(job_id, exit_code, event_type)
-      vim.schedule(function()
-        -- swap back to original window and reload
-        hammer_split_context:switch_to_original_window()
-        vim.cmd("e!")
-
-        hammer_step1()
-      end)
-    end,
-  })
-end
-
--- Hammer step one locates the project's hammer.sh script and runs it
-hammer_step1 = function()
-  -- If TTL has hit 0 then stop
-  if hammer_ttl == 0 then
-    vim.schedule(function()
-      hammer_split_context:append("Hammer hit loop limit")
-      reset_status_bar()
-    end)
-    return
-  end
-
-  hammer_ttl = hammer_ttl - 1
-
-  set_status_bar()
-
-  -- look for hammer.sh in the current directory and up
-  local hammer_script_path = find_hammer_script()
-  if hammer_script_path == nil then
-    vim.api.nvim_err_writeln("Could not find hammer.sh, add it to the base dir of this project")
-    reset_status_bar()
-    return
-  end
-
-  hammerlog = ""
-
-  -- This runs user-defined hammer script, the assumption
-  -- is that it will be in the current directory or in a dir up the
-  -- file tree, e.g. in the base dir
-  -- The hammer script should return non-zero if there is more work
-  -- and it should output debugging info, like build errors or test
-  -- failures
-  vim.fn.jobstart(hammer_script_path, {
-    on_stdout = function(job_id, data)
-      vim.schedule(function()
-        hammer_split_context:append(data)
-        hammerlog = hammerlog .. table.concat(data, "\n")
-      end)
-    end,
-
-    on_stderr = function(job_id, data)
-      vim.schedule(function()
-        hammer_split_context:append(data)
-        hammerlog = hammerlog .. table.concat(data, "\n")
-      end)
-    end,
-
-    on_exit = function(job_id, exit_code, event_type)
-      to_print = status_text
-      vim.schedule(function()
-        status_text = "status: " .. exit_code
-        hammer_split_context:append_line(status_text)
-        hammer_step2(exit_code)
-      end)
-    end,
-  })
-end
-
--- Hammer mode loops the LM until it reaches an end condition. The end
--- condition is defined in hammer.sh in the base path, i.e. it returns non-zero
--- if not met. For example, you could set hammer.sh to run tests, when it runs
--- it produces first compiler errors, which the LM fixes, then it produces test
--- failures, which the LM fixes, then hammer.sh exits with 0 when all tests pass.
--- Loop steps:
---  - Run hammer.sh, get the exit code and output
---    - If exit code is 0, exit
---  - Add / update hammer annotation
---  - Send file content and hammer.sh output to LM, ask for fixes, returned and applied as LM tools
---  - File is saved and reloaded
-butterfish.hammer = function()
-  hammer_ttl = 5 -- Loop a max of 5 times
-
-  if hammer_split_context == nil then
-    hammer_split_context = SplitContext.new()
-  end
-
-  hammer_split_context:create_split()
-  hammer_split_context:append_line("Hammer mode started")
-  hammer_step1()
-end
-
-edit_split = nil
 
 -- Function to edit the current buffer using LLM
-butterfish.edit = function(prompt)
+butterfish.edit = function(start_range, end_range, prompt)
+  if not ensure_buffer_available() then
+    return
+  end
   -- Write the current buffer to disk
   vim.cmd("silent noautocmd w!")
 
@@ -722,45 +667,109 @@ butterfish.edit = function(prompt)
   -- Get the current file path and file type
   local filepath = vim.fn.expand("%:p")
   local filetype = vim.bo.filetype
+  local bufnr = vim.api.nvim_get_current_buf()
+  local line_range = get_line_range(start_range, end_range)
+  local replace_start = start_range
+  local replace_end = end_range
+
+  if replace_start == nil or replace_end == nil then
+    local current_line = vim.api.nvim_win_get_cursor(0)[1]
+    replace_start = current_line
+    replace_end = current_line
+  end
 
   -- Create a command to send to the LLM for editing the current buffer
   local command = butterfish.script_dir ..
     "edit " ..
     filetype .. " " ..
     filepath .. " " ..
-    "1" .. -- dummy line range
+    line_range .. " " ..
     " '" .. escape_code(prompt) .. "'" ..
     " '" .. butterfish.lm_smart_model .. "'" ..
     " '" .. butterfish.lm_base_path .. "'"
 
-  if edit_split == nil then
-    edit_split = SplitContext.new()
-  end
-  edit_split:create_split()
-  edit_split:append_line("Editing " .. filepath)
+  local stdout_lines = {}
+  local stderr_lines = {}
 
-  vim.fn.jobstart(command, {
+  local job_id = vim.fn.jobstart(command, {
+    stdout_buffered = true,
+    stderr_buffered = true,
+
     on_stdout = function(job_id, data)
-      vim.schedule(function()
-        edit_split:append(data)
-      end)
+      if data == nil then
+        return
+      end
+      for _, line in ipairs(data) do
+        table.insert(stdout_lines, line)
+      end
     end,
 
     on_stderr = function(job_id, data)
-      vim.schedule(function()
-        edit_split:append(data)
-      end)
+      if data == nil then
+        return
+      end
+      for _, line in ipairs(data) do
+        table.insert(stderr_lines, line)
+      end
     end,
 
     on_exit = function(job_id, exit_code, event_type)
       vim.schedule(function()
-        -- swap back to original window and reload
-        edit_split:switch_to_original_window()
-        vim.cmd("e!")
-        reset_status_bar()
+        local was_cancelled = cancelled_jobs[job_id] == true
+        if was_cancelled then
+          track_job_finished(job_id)
+          return
+        end
+
+        local replacement_lines = trim_trailing_empty_lines(stdout_lines)
+        local error_lines = trim_trailing_empty_lines(stderr_lines)
+
+        if exit_code ~= 0 then
+          local stderr_text = table.concat(error_lines, "\n")
+          if stderr_text == "" then
+            stderr_text = "BFEdit failed with exit code " .. exit_code
+          end
+          vim.api.nvim_err_writeln(stderr_text)
+          track_job_finished(job_id)
+          return
+        end
+
+        if #replacement_lines == 0 then
+          vim.api.nvim_err_writeln("BFEdit failed: empty model response")
+          track_job_finished(job_id)
+          return
+        end
+
+        with_temporary_modifiable(bufnr, function()
+          if not vim.api.nvim_buf_is_valid(bufnr) then
+            return
+          end
+          vim.api.nvim_buf_set_lines(bufnr, replace_start - 1, replace_end, false, replacement_lines)
+        end)
+        track_job_finished(job_id)
       end)
     end,
   })
+
+  if not track_job_started(job_id, bufnr) then
+    reset_status_bar()
+  end
+end
+
+-- Cancel all active Butterfish jobs.
+butterfish.cancel = function()
+  local cancelled_count = 0
+  for job_id, _ in pairs(active_jobs) do
+    cancelled_jobs[job_id] = true
+    vim.fn.jobstop(job_id)
+    cancelled_count = cancelled_count + 1
+  end
+
+  if cancelled_count == 0 then
+    print("No active Butterfish job")
+  else
+    print("Cancelled " .. cancelled_count .. " Butterfish job(s)")
+  end
 end
 
 -- Commands for each function
@@ -772,8 +781,7 @@ vim.cmd("command! -range -nargs=* BFExplain :lua require'butterfish'.explain(<li
 vim.cmd("command! -range -nargs=* BFQuestion :lua require'butterfish'.question(<line1>, <line2>, <q-args>)")
 vim.cmd("command! BFFix lua require'butterfish'.fix()")
 vim.cmd("command! BFImplement lua require'butterfish'.implement()")
-vim.cmd("command! -nargs=* BFEdit lua require'butterfish'.edit(<q-args>)")
-vim.cmd("command! BFHammer lua require'butterfish'.hammer()")
+vim.cmd("command! -range -nargs=* BFEdit :lua require'butterfish'.edit(<line1>, <line2>, <q-args>)")
+vim.cmd("command! BFCancel lua require'butterfish'.cancel()")
 
 return butterfish
-

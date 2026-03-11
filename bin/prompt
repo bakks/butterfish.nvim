@@ -29,7 +29,7 @@ sysmsg="You are helping an expert programmer write code. Respond only with code,
 attention_note=""
 
 if [ -n "$fileblock" ]; then
-  attention_note="$fullprompt
+  attention_note="
 
 Pay attention to the following code:
 \"\"\"
@@ -44,4 +44,3 @@ $attention_note
 Add the following code: $prompt"
 
 lm_command "$sysmsg" "$fullprompt"
-
